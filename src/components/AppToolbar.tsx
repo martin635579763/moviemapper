@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { Settings, Upload, Download, MousePointer, Eraser, Sofa, Tv2, Footprints, SquarePlus, Save, ListRestart } from 'lucide-react';
+import { Settings, Upload, Download, MousePointer, Eraser, Sofa, Tv2, Footprints, SquarePlus, Save, ListRestart, Search } from 'lucide-react';
 import { sampleLayouts } from '@/data/sample-layouts';
 import { DEFAULT_ROWS, DEFAULT_COLS } from '@/lib/layout-utils';
 import {
@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { cn } from "@/lib/utils"; // Added import for cn
 
 
 const TOOLBAR_TOOLS_CONFIG: { value: EditorTool; label: string; icon: React.ElementType }[] = [
@@ -336,7 +337,7 @@ const CommandInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = ({ c
     <Input className={cn("flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 focus-visible:ring-0 focus-visible:ring-offset-0", className)} {...props} />
   </div>
 );
-import { Search } from 'lucide-react'; // ensure Search is imported
+
 const CommandList: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, ...props }) => (
   <div className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)} {...props} />
 );
