@@ -51,7 +51,7 @@ export const AppToolbar: React.FC = () => {
     initializeLayout,
     loadLayout, exportLayout,
     saveLayoutToStorage, loadLayoutFromStorage, getStoredLayoutNames, deleteStoredLayout,
-    clearSeatSelection
+    // clearSeatSelection // Removed as it's no longer in context
   } = useLayoutContext();
 
   const [rows, setRows] = useState(layout.rows || DEFAULT_ROWS);
@@ -81,7 +81,7 @@ export const AppToolbar: React.FC = () => {
 
   const handleInitialize = () => {
     initializeLayout(rows, cols, layoutName);
-    clearSeatSelection(); // Clear selection when initializing a new layout
+    // clearSeatSelection(); // Removed call
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,7 +98,7 @@ export const AppToolbar: React.FC = () => {
         try {
           const loadedLayoutData = JSON.parse(e.target?.result as string);
           loadLayout(loadedLayoutData); // loadLayout now handles updating context's layout name
-          clearSeatSelection();
+          // clearSeatSelection(); // Removed call
         } catch (error) {
           console.error("Failed to parse layout file:", error);
         }
@@ -215,7 +215,7 @@ export const AppToolbar: React.FC = () => {
              <Select onValueChange={(value) => {
                 if (value === "__manage__") return;
                 loadLayoutFromStorage(value);
-                clearSeatSelection();
+                // clearSeatSelection(); // Removed call
               }}>
               <SelectTrigger className="w-[160px] h-9 text-xs">
                 <SelectValue placeholder="Load from Browser" />
@@ -240,7 +240,7 @@ export const AppToolbar: React.FC = () => {
             const selectedSample = sampleLayouts.find(sl => sl.name === value);
             if (selectedSample) {
               loadLayout(JSON.parse(JSON.stringify(selectedSample))); // Deep copy
-              clearSeatSelection();
+              // clearSeatSelection(); // Removed call
             }
           }}>
           <SelectTrigger className="w-[150px] h-9 text-xs">
