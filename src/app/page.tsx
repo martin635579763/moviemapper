@@ -1,25 +1,32 @@
 
-"use client"; // Required for context and client-side interactions
+import { sampleFilms } from '@/data/films';
+import { FilmCard } from '@/components/FilmCard';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Settings } from 'lucide-react';
 
-import { LayoutProvider } from '@/contexts/LayoutContext';
-import { AppToolbar } from '@/components/AppToolbar';
-import { LayoutEditor } from '@/components/LayoutEditor';
-import { LayoutPreview } from '@/components/LayoutPreview';
 
 export default function HomePage() {
   return (
-    <LayoutProvider>
-      <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
-        <AppToolbar />
-        <main className="flex flex-1 overflow-auto p-2 gap-2">
-          <div className="flex-grow w-2/3"> {/* Editor takes more space by default */}
-            <LayoutEditor />
-          </div>
-          <div className="flex-grow w-1/3"> {/* Preview takes less space */}
-            <LayoutPreview />
-          </div>
-        </main>
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 text-foreground p-4 sm:p-6 md:p-8">
+      <header className="mb-8 flex justify-between items-center">
+        <h1 className="text-3xl sm:text-4xl font-bold text-primary tracking-tight">
+          Now Showing
+        </h1>
+        <Link href="/editor" passHref legacyBehavior>
+          <Button variant="outline">
+            <Settings className="mr-2 h-4 w-4" /> Layout Editor
+          </Button>
+        </Link>
+      </header>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+        {sampleFilms.map(film => (
+          <FilmCard key={film.id} film={film} />
+        ))}
       </div>
-    </LayoutProvider>
+      <footer className="text-center mt-12 py-6 text-muted-foreground text-sm">
+        Powered by Firebase Studio
+      </footer>
+    </div>
   );
 }
