@@ -11,9 +11,7 @@ export const LayoutEditor: React.FC = () => {
 
   if (!layout) return <p>Loading editor...</p>;
 
-  const handleCellClick = (rowIndex: number, colIndex: number) => {
-    updateCell(rowIndex, colIndex);
-  };
+  let seatCounter = 0;
 
   return (
     <Card className="flex-1 m-2 shadow-lg">
@@ -32,16 +30,24 @@ export const LayoutEditor: React.FC = () => {
             aria-label={`Cinema hall editor grid, ${layout.rows} rows by ${layout.cols} columns`}
           >
             {layout.grid.map((row, rowIndex) =>
-              row.map((cell, colIndex) => (
-                <GridCell
-                  key={cell.id}
-                  cell={cell}
-                  onClick={() => handleCellClick(rowIndex, colIndex)}
-                  isEditorCell
-                  aria-rowindex={rowIndex + 1}
-                  aria-colindex={colIndex + 1}
-                />
-              ))
+              row.map((cell, colIndex) => {
+                let currentSeatNumber: number | undefined = undefined;
+                if (cell.type === 'seat') {
+                  seatCounter++;
+                  currentSeatNumber = seatCounter;
+                }
+                return (
+                  <GridCell
+                    key={cell.id}
+                    cell={cell}
+                    seatNumber={currentSeatNumber}
+                    onClick={() => handleCellClick(rowIndex, colIndex)}
+                    isEditorCell
+                    aria-rowindex={rowIndex + 1}
+                    aria-colindex={colIndex + 1}
+                  />
+                );
+              })
             )}
           </div>
         </ScrollArea>

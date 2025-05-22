@@ -1,5 +1,6 @@
 import type { HTMLAttributes } from 'react';
 import React from 'react';
+import Image from 'next/image';
 import type { CellData, SeatCategory } from '@/types/layout';
 import { cn } from '@/lib/utils';
 import { SeatIcon } from './icons/SeatIcon';
@@ -9,6 +10,7 @@ import { Accessibility } from 'lucide-react';
 
 interface GridCellProps extends HTMLAttributes<HTMLButtonElement> {
   cell: CellData;
+  seatNumber?: number | string;
   isEditorCell?: boolean;
   isPreviewCell?: boolean;
   currentPreviewMode?: 'normal' | 'screen-view' | 'occlusion';
@@ -28,8 +30,8 @@ const getSeatColor = (category?: SeatCategory) => {
   }
 };
 
-export const GridCell: React.FC<GridCellProps> = ({ cell, isEditorCell = false, isPreviewCell = false, currentPreviewMode = 'normal', className, ...props }) => {
-  const baseStyle = "w-full h-full aspect-square flex items-center justify-center border border-border/50 rounded-sm transition-colors duration-150";
+export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCell = false, isPreviewCell = false, currentPreviewMode = 'normal', className, ...props }) => {
+  const baseStyle = "w-full h-full aspect-square flex items-center justify-center border border-border/50 rounded-sm transition-colors duration-150 relative overflow-hidden";
   const editorHoverStyle = isEditorCell ? "hover:bg-secondary/50" : "";
   
   let content = null;
@@ -43,15 +45,37 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, isEditorCell = false, 
         isPreviewCell && currentPreviewMode === 'screen-view' && cell.hasGoodView && 'ring-2 ring-green-500',
         isPreviewCell && currentPreviewMode === 'screen-view' && !cell.hasGoodView && cell.isOccluded && 'opacity-30 bg-red-500/30'
       );
-      content = cell.category === 'accessible' ? <Accessibility className="w-3/4 h-3/4" /> : <SeatIcon className="w-3/4 h-3/4" />;
+      content = (
+        <>
+          {cell.category === 'accessible' ? <Accessibility className="w-3/4 h-3/4" /> : <SeatIcon className="w-3/4 h-3/4" />}
+          {seatNumber && (
+            <span className="absolute text-xs font-semibold text-white" style={{ textShadow: '0px 0px 2px rgba(0,0,0,0.7)' }}>
+              {seatNumber}
+            </span>
+          )}
+        </>
+      );
       break;
     case 'aisle':
       cellStyle = "bg-muted/30";
-      content = isEditorCell || isPreviewCell ? <AisleIcon className="w-1/2 h-1/2 text-muted-foreground" /> : null; // Show icon in editor/preview
+      content = isEditorCell || isPreviewCell ? <AisleIcon className="w-1/2 h-1/2 text-muted-foreground" /> : null;
       break;
     case 'screen':
       cellStyle = "bg-foreground/80 text-background";
-      content = <ScreenIcon className="w-3/4 h-3/4" />;
+      if (isPreviewCell) {
+        content = (
+          <Image
+            src="https://placehold.co/100x60.png"
+            alt="Movie screen placeholder"
+            layout="fill"
+            objectFit="cover"
+            data-ai-hint="movie screen"
+            priority={false} 
+          />
+        );
+      } else {
+        content = <ScreenIcon className="w-3/4 h-3/4" />;
+      }
       break;
     case 'empty':
     default:
@@ -62,7 +86,7 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, isEditorCell = false, 
   if (isEditorCell) {
     return (
       <button
-        aria-label={`Cell ${cell.id}, type ${cell.type}${cell.category ? `, category ${cell.category}` : ''}`}
+        aria-label={`Cell ${cell.id}, type ${cell.type}${cell.category ? `, category ${cell.category}` : ''}${seatNumber ? `, seat ${seatNumber}` : ''}`}
         className={cn(baseStyle, editorHoverStyle, cellStyle, className)}
         {...props}
       >
@@ -72,7 +96,7 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, isEditorCell = false, 
   }
 
   return (
-    <div className={cn(baseStyle, cellStyle, className)} title={`Cell ${cell.id}, type ${cell.type}`}>
+    <div className={cn(baseStyle, cellStyle, className)} title={`Cell ${cell.id}, type ${cell.type}${seatNumber ? `, seat ${seatNumber}` : ''}`}>
       {content}
     </div>
   );

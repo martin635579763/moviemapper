@@ -14,6 +14,8 @@ export const LayoutPreview: React.FC = () => {
 
   if (!layout) return <p>Loading preview...</p>;
 
+  let seatCounter = 0;
+
   return (
     <Card className="flex-1 m-2 shadow-lg w-1/3 lg:w-1/2 xl:w-2/5"> {/* Adjust width */}
       <CardHeader>
@@ -53,16 +55,24 @@ export const LayoutPreview: React.FC = () => {
             aria-label={`Cinema hall preview grid, ${layout.rows} rows by ${layout.cols} columns`}
           >
             {layout.grid.map((row, rowIndex) =>
-              row.map((cell, colIndex) => (
-                <GridCell
-                  key={cell.id}
-                  cell={cell}
-                  isPreviewCell
-                  currentPreviewMode={previewMode}
-                  aria-rowindex={rowIndex + 1}
-                  aria-colindex={colIndex + 1}
-                />
-              ))
+              row.map((cell, colIndex) => {
+                let currentSeatNumber: number | undefined = undefined;
+                if (cell.type === 'seat') {
+                  seatCounter++;
+                  currentSeatNumber = seatCounter;
+                }
+                return (
+                  <GridCell
+                    key={cell.id}
+                    cell={cell}
+                    seatNumber={currentSeatNumber}
+                    isPreviewCell
+                    currentPreviewMode={previewMode}
+                    aria-rowindex={rowIndex + 1}
+                    aria-colindex={colIndex + 1}
+                  />
+                );
+              })
             )}
           </div>
         </ScrollArea>
