@@ -15,11 +15,11 @@ export const LayoutPreview: React.FC = () => {
   if (!layout) return <p>Loading preview...</p>;
 
   return (
-    <Card className="flex-1 m-2 shadow-lg w-1/3 lg:w-1/2 xl:w-2/5"> {/* Adjust width */}
+    <Card className="h-full flex flex-col m-2 shadow-lg">
       <CardHeader>
         <CardTitle>Layout Preview: {layout.name}</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col flex-1 p-6 pt-0 overflow-hidden">
         <div className="mb-4">
           <Label className="mb-2 block">Preview Mode:</Label>
           <RadioGroup
@@ -42,12 +42,12 @@ export const LayoutPreview: React.FC = () => {
             </div>
           </RadioGroup>
         </div>
-        <ScrollArea className="w-full h-[calc(100vh-260px)] lg:h-auto"> {/* Adjust height */}
+        <ScrollArea className="flex-1 w-full">
           <div
             className="grid gap-0.5 bg-muted/10 p-1 rounded"
              style={{
-              gridTemplateColumns: `repeat(${layout.cols}, minmax(10px, 1fr))`,
-              maxWidth: `${layout.cols * 30}px` // Max cell width for preview
+              gridTemplateColumns: `repeat(${layout.cols}, minmax(12px, 1fr))`,
+              maxWidth: `${layout.cols * 24}px` // Max cell width for preview (12px min, 24px max approx)
             }}
             role="grid"
             aria-label={`Cinema hall preview grid, ${layout.rows} rows by ${layout.cols} columns`}
@@ -78,7 +78,7 @@ export const LayoutPreview: React.FC = () => {
           </div>
         </ScrollArea>
         {previewMode !== 'normal' && (
-          <div className="mt-4 text-xs space-y-1">
+          <div className="mt-4 text-xs space-y-1 pt-2"> {/* Added pt-2 for spacing from scrollarea */}
             {previewMode === 'screen-view' && <p><span className="inline-block w-3 h-3 rounded-sm ring-2 ring-green-500 mr-1 align-middle"></span> Seats with good view.</p>}
             {(previewMode === 'screen-view' || previewMode === 'occlusion') && <p><span className="inline-block w-3 h-3 rounded-sm bg-red-500/30 opacity-50 mr-1 align-middle"></span> Occluded seats.</p>}
             <p className="text-muted-foreground">Note: Screen view and occlusion are simplified estimations.</p>
