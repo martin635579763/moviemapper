@@ -1,3 +1,4 @@
+
 export type CellType = 'empty' | 'seat' | 'aisle' | 'screen';
 export type SeatCategory = 'standard' | 'premium' | 'accessible' | 'loveseat';
 export type EditorTool = 'select' | 'seat' | 'aisle' | 'screen' | 'eraser';
@@ -9,8 +10,9 @@ export interface CellData {
   type: CellType;
   category?: SeatCategory; // For seats
   status?: SeatStatus; // For seats in ticket selling demo
-  isOccluded?: boolean; // For occlusion preview
-  hasGoodView?: boolean; // For screen view preview
+  // isOccluded and hasGoodView are primarily for rendering in preview and might not be persisted in core layout state
+  isOccluded?: boolean; 
+  hasGoodView?: boolean; 
 }
 
 export interface HallLayout {
@@ -34,15 +36,13 @@ export interface LayoutContextType {
   updateCell: (row: number, col: number) => void;
   loadLayout: (newLayout: HallLayout) => void;
   exportLayout: () => void;
-  calculatePreview: () => void;
+  // calculatePreview removed from context as it's handled differently now
 
-  // localStorage template functions
   saveLayoutToStorage: (saveName: string) => boolean;
   loadLayoutFromStorage: (layoutName: string) => void;
   deleteStoredLayout: (layoutName: string) => void;
   getStoredLayoutNames: () => string[];
 
-  // Ticket selling demo functions
   selectedSeatsForPurchase: CellData[];
   toggleSeatSelection: (row: number, col: number) => void;
   confirmTicketPurchase: () => void;

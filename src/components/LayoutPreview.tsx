@@ -1,6 +1,6 @@
 
 "use client";
-import React from 'react';
+import React, { useMemo } from 'react'; // Added useMemo
 import { useLayoutContext } from '@/contexts/LayoutContext';
 import { GridCell } from './GridCell';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -8,11 +8,29 @@ import { ScrollArea } from './ui/scroll-area';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Button } from '@/components/ui/button';
-import type { PreviewMode } from '@/types/layout';
+import type { PreviewMode, SeatStatus } from '@/types/layout'; // Added SeatStatus
 import { Ticket } from 'lucide-react';
+import { calculatePreviewStates } from '@/lib/layout-utils'; // Added import
 
 export const LayoutPreview: React.FC = () => {
   const { layout, previewMode, setPreviewMode, toggleSeatSelection, selectedSeatsForPurchase, confirmTicketPurchase, clearSeatSelection } = useLayoutContext();
+
+  const displayedGrid = useMemo(() => {
+    if (!layout) return [];
+    if (previewMode === 'normal') {
+      // For normal mode, just use the layout grid, ensuring seats have a status
+      return layout.grid.map(row => row.map(cell => {
+        if (cell.type === 'seat' && !cell.status) {
+          return { ...cell, status: 'available' as SeatStatus };
+        }
+        return cell;
+      }));
+    }
+    // For other preview modes, calculate preview states (isOccluded, hasGoodView)
+    // calculatePreviewStates also ensures default statuses for seats
+    const previewLayout = calculatePreviewStates(layout);
+    return previewLayout.grid;
+  }, [layout, previewMode]);
 
   if (!layout) return <p>Loading preview...</p>;
 
@@ -23,13 +41,12 @@ export const LayoutPreview: React.FC = () => {
   return (
     <Card className="h-full flex flex-col m-2 shadow-lg">
       <CardHeader>
-        <CardTitle>{layout.name}</CardTitle> {/* Changed this line */}
+        <CardTitle>{layout.name}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col flex-1 p-4 pt-0 overflow-hidden">
         <div className="mb-3">
           <Label className="mb-1.5 block text-sm font-medium">Preview Mode:</Label>
           <RadioGroup
-            defaultValue="normal"
             value={previewMode}
             onValueChange={(value: PreviewMode) => setPreviewMode(value)}
             className="flex space-x-3"
@@ -50,15 +67,14 @@ export const LayoutPreview: React.FC = () => {
         </div>
         <ScrollArea className="flex-1 w-full border rounded-md p-1 bg-muted/20">
           <div
-            className="grid gap-px bg-background" // gap-px with bg-background creates thin lines
+            className="grid gap-px bg-background"
              style={{
-              gridTemplateColumns: `repeat(${layout.cols}, minmax(10px, 1fr))`, // Adjusted minmax for smaller cells
-              // maxWidth: `${layout.cols * 20}px` // Adjusted max cell width for preview
+              gridTemplateColumns: `repeat(${layout.cols}, minmax(10px, 1fr))`,
             }}
             role="grid"
             aria-label={`Cinema hall preview grid, ${layout.rows} rows by ${layout.cols} columns`}
           >
-            {layout.grid.map((rowArr, rowIndex) => {
+            {displayedGrid.map((rowArr, rowIndex) => { // Use displayedGrid
               let seatInRowCount = 0;
               const rowLetter = String.fromCharCode('A'.charCodeAt(0) + rowIndex);
 
@@ -71,14 +87,14 @@ export const LayoutPreview: React.FC = () => {
                 return (
                   <GridCell
                     key={cell.id}
-                    cell={cell}
+                    cell={cell} // cell from displayedGrid will have preview properties if mode is active
                     seatNumber={currentSeatNumberDisplay}
                     isPreviewCell
-                    currentPreviewMode={previewMode}
+                    currentPreviewMode={previewMode} // GridCell uses this to apply styles
                     onPreviewClick={cell.type === 'seat' && cell.status !== 'sold' ? () => handleSeatClick(rowIndex, colIndex) : undefined}
                     aria-rowindex={rowIndex + 1}
                     aria-colindex={colIndex + 1}
-                    className="min-w-[10px] min-h-[10px]" // Ensure cells have a minimum size
+                    className="min-w-[10px] min-h-[10px]"
                   />
                 );
               });
