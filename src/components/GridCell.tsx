@@ -100,10 +100,13 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
     case 'screen':
       if (isPreviewCell) {
         cellDynamicStyle = "bg-white dark:bg-gray-700 border border-slate-300 dark:border-slate-600"; 
-        content = null; 
+        content = <ScreenIcon className="w-full h-full text-gray-400 dark:text-gray-500" />; 
       } else { // Editor cell
         cellDynamicStyle = "bg-foreground/80 text-background";
-        content = <ScreenIcon className="w-3/4 h-3/4" />;
+        // If it's an editor cell and part of a merged screen (shouldApplyAspectSquare is false),
+        // constrain icon height and let width be auto to maintain aspect ratio without stretching the cell.
+        const iconClass = (isEditorCell && !shouldApplyAspectSquare) ? "h-3/4 w-auto max-w-full" : "w-3/4 h-3/4";
+        content = <ScreenIcon className={iconClass} />;
       }
       break;
     case 'empty':
@@ -139,6 +142,7 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
     );
   }
 
+  // For preview cells that are seats (and thus potentially clickable for selection - though selection is currently removed)
   if (isPreviewCell && cell.type === 'seat' && onPreviewClick) {
     return (
       <button
@@ -150,10 +154,11 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
       </button>
     );
   }
-
+  
+  // For all other preview cells (aisles, non-merged screens, empty) or cells not matching above conditions
   return (
     <div 
-        title={`Cell ${cell.id}, type ${cell.type}${seatNumber ? `, seat ${seatNumber}` : ''}`}
+        title={`Cell ${cell.id}, type ${cell.type}${cell.category ? `, category ${cell.category}` : ''}${seatNumber ? `, seat ${seatNumber}` : ''}`}
         {...commonProps}
     >
       {content}
