@@ -5,20 +5,22 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { LayoutProvider, useLayoutContext } from '@/contexts/LayoutContext';
-// AppToolbar removed as it's not needed for ticket purchasing view
 import { LayoutPreview } from '@/components/LayoutPreview';
 import { sampleFilms, type Film } from '@/data/films';
-import { sampleLayouts } from '@/data/sample-layouts';
+import { sampleLayouts } from '@/data/sample-layouts'; // Added import
 import type { HallLayout } from '@/types/layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, Clock, Ticket as TicketIconLucide } from 'lucide-react'; // Renamed TicketIcon to avoid conflict if any
+import { ArrowLeft, CalendarDays, Clock, Ticket as TicketIconLucide, ChevronDown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added imports
+import { Label } from '@/components/ui/label';
 
 // This component will consume the LayoutContext
 const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayout }> = ({ film, initialLayout }) => {
-  const { loadLayout, layout } = useLayoutContext();
+  const { loadLayout, layout, clearSeatSelection, getStoredLayoutNames, loadLayoutFromStorage } = useLayoutContext();
+  const [availableLayoutNames, setAvailableLayoutNames] = useState<string[]>([]);
 
   useEffect(() => {
     // Deep copy layout to avoid modifying the original sampleLayouts array
@@ -28,6 +30,27 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
     }
   }, [initialLayout, loadLayout, layout]);
 
+  useEffect(() => {
+    const sampleNames = sampleLayouts.map(l => l.name);
+    const storedNames = getStoredLayoutNames();
+    // Combine and remove duplicates
+    const allNames = Array.from(new Set([...sampleNames, ...storedNames]));
+    setAvailableLayoutNames(allNames.sort());
+  }, [getStoredLayoutNames]);
+
+
+  const handleHallSelectionChange = (selectedLayoutName: string) => {
+    if (!selectedLayoutName || selectedLayoutName === layout.name) return;
+
+    const sampleLayoutToLoad = sampleLayouts.find(sl => sl.name === selectedLayoutName);
+    if (sampleLayoutToLoad) {
+      loadLayout(JSON.parse(JSON.stringify(sampleLayoutToLoad))); // Deep copy
+    } else {
+      // If not a sample layout, assume it's a stored layout
+      loadLayoutFromStorage(selectedLayoutName);
+    }
+    clearSeatSelection();
+  };
 
   return (
     <div className="flex flex-col xl:flex-row gap-6 p-4 md:p-6 max-w-screen-2xl mx-auto">
@@ -41,7 +64,7 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
               className="object-cover"
-              data-ai-hint={film.genre.split(',')[0].toLowerCase() || "movie poster"}
+              data-ai-hint={film.genre.split(',')[0].toLowerCase().replace(/\s+/g, '') || "movie"}
               priority
             />
           </div>
@@ -66,11 +89,34 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
       <div className="xl:w-2/3 flex flex-col">
         <div className="mb-4">
             <h2 className="text-2xl font-semibold text-primary mb-1">Select Your Seats</h2>
-            <p className="text-muted-foreground">
-              You are viewing the seat layout for <span className="font-semibold text-foreground">{initialLayout.name}</span>. Choose available seats below.
-            </p>
+            {layout && (
+              <p className="text-muted-foreground mb-3">
+                Viewing seat layout for <span className="font-semibold text-foreground">{layout.name}</span>. Choose available seats below.
+              </p>
+            )}
+             {availableLayoutNames.length > 0 && (
+              <div className="mb-4 max-w-xs">
+                <Label htmlFor="hall-select" className="text-sm font-medium text-muted-foreground mb-1.5 block">
+                  Change Hall Layout:
+                </Label>
+                <Select
+                  value={layout?.name || ""}
+                  onValueChange={handleHallSelectionChange}
+                >
+                  <SelectTrigger id="hall-select" className="w-full">
+                    <SelectValue placeholder="Select a hall layout" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableLayoutNames.map(name => (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
         </div>
-        {/* AppToolbar removed from here to streamline the ticket purchasing view */}
         <div className="flex-grow mt-1 rounded-lg overflow-hidden shadow-md">
           <div className="h-full min-h-[400px] lg:min-h-[500px] flex flex-col">
              <LayoutPreview /> {/* LayoutPreview uses the context for layout data and interactions */}
@@ -133,3 +179,4 @@ export default function FilmPage() {
     </LayoutProvider>
   );
 }
+
