@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import type { EditorTool, SeatCategory } from '@/types/layout';
 import { useLayoutContext } from '@/contexts/LayoutContext';
 import { Button } from '@/components/ui/button';
@@ -10,9 +10,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { Settings, Upload, Download, MousePointer, Eraser, Sofa, Tv2, Footprints, SquarePlus } from 'lucide-react';
+import { Settings, Upload, Download, MousePointer, Eraser, Sofa, Tv2, Footprints, SquarePlus, Save, ListRestart } from 'lucide-react';
 import { sampleLayouts } from '@/data/sample-layouts';
 import { DEFAULT_ROWS, DEFAULT_COLS } from '@/lib/layout-utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
 
 const TOOLBAR_TOOLS_CONFIG: { value: EditorTool; label: string; icon: React.ElementType }[] = [
   { value: 'select', label: 'Select', icon: MousePointer },
@@ -37,16 +49,38 @@ export const AppToolbar: React.FC = () => {
     selectedSeatCategory, setSelectedSeatCategory,
     initializeLayout,
     loadLayout, exportLayout,
+    saveLayoutToStorage, loadLayoutFromStorage, getStoredLayoutNames, deleteStoredLayout,
+    clearSeatSelection
   } = useLayoutContext();
 
   const [rows, setRows] = useState(layout.rows || DEFAULT_ROWS);
   const [cols, setCols] = useState(layout.cols || DEFAULT_COLS);
   const [layoutName, setLayoutName] = useState(layout.name || "New Hall");
+  const [saveLayoutNameInput, setSaveLayoutNameInput] = useState("");
+  const [storedLayoutNames, setStoredLayoutNames] = useState<string[]>([]);
+  const [layoutToDelete, setLayoutToDelete] = useState<string | null>(null);
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    setLayoutName(layout.name);
+    setRows(layout.rows);
+    setCols(layout.cols);
+    setSaveLayoutNameInput(layout.name); // Pre-fill save input with current layout name
+  }, [layout.name, layout.rows, layout.cols]);
+
+  const refreshStoredNames = useCallback(() => {
+    setStoredLayoutNames(getStoredLayoutNames());
+  }, [getStoredLayoutNames]);
+
+  useEffect(() => {
+    refreshStoredNames();
+  }, [refreshStoredNames]);
+
   const handleInitialize = () => {
     initializeLayout(rows, cols, layoutName);
+    clearSeatSelection(); // Clear selection when initializing a new layout
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,19 +95,31 @@ export const AppToolbar: React.FC = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const loadedLayout = JSON.parse(e.target?.result as string);
-          loadLayout(loadedLayout);
-          setLayoutName(loadedLayout.name);
-          setRows(loadedLayout.rows);
-          setCols(loadedLayout.cols);
+          const loadedLayoutData = JSON.parse(e.target?.result as string);
+          loadLayout(loadedLayoutData); // loadLayout now handles updating context's layout name
+          clearSeatSelection();
         } catch (error) {
           console.error("Failed to parse layout file:", error);
-          // Toast is handled in context's loadLayout
         }
       };
       reader.readAsText(file);
     }
   };
+
+  const handleSaveToStorage = () => {
+    if (saveLayoutToStorage(saveLayoutNameInput)) {
+      refreshStoredNames();
+    }
+  };
+
+  const handleDeleteStoredLayout = () => {
+    if (layoutToDelete) {
+      deleteStoredLayout(layoutToDelete);
+      refreshStoredNames();
+      setLayoutToDelete(null);
+    }
+  };
+
 
   const toolClickHandlers = useMemo(() => {
     return TOOLBAR_TOOLS_CONFIG.reduce((acc, toolConfig) => {
@@ -84,11 +130,11 @@ export const AppToolbar: React.FC = () => {
 
   return (
     <TooltipProvider>
-      <div className="p-3 border-b bg-card shadow-sm flex flex-wrap items-center gap-4">
-        <h1 className="text-xl font-semibold text-primary mr-4">SeatLayout</h1>
+      <div className="p-3 border-b bg-card shadow-sm flex flex-wrap items-center gap-2 text-sm">
+        <h1 className="text-lg font-semibold text-primary mr-3 whitespace-nowrap">SeatLayout</h1>
 
         {/* Tools */}
-        <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
+        <div className="flex items-center gap-0.5 bg-muted p-0.5 rounded-md">
           {TOOLBAR_TOOLS_CONFIG.map(tool => (
             <Tooltip key={tool.value}>
               <TooltipTrigger asChild>
@@ -96,10 +142,10 @@ export const AppToolbar: React.FC = () => {
                   variant={selectedTool === tool.value ? "default" : "ghost"}
                   size="icon"
                   onClick={toolClickHandlers[tool.value]}
-                  className={selectedTool === tool.value ? "text-primary-foreground bg-primary" : "text-foreground"}
+                  className={selectedTool === tool.value ? "text-primary-foreground bg-primary h-8 w-8" : "text-foreground h-8 w-8"}
                   aria-label={tool.label}
                 >
-                  <tool.icon className="h-5 w-5" />
+                  <tool.icon className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent><p>{tool.label}</p></TooltipContent>
@@ -109,18 +155,18 @@ export const AppToolbar: React.FC = () => {
         
         {selectedTool === 'seat' && (
           <Select value={selectedSeatCategory} onValueChange={(value: SeatCategory) => setSelectedSeatCategory(value)}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-[130px] h-9 text-xs">
               <SelectValue placeholder="Seat Category" />
             </SelectTrigger>
             <SelectContent>
               {SEAT_CATEGORIES_CONFIG.map(cat => (
-                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                <SelectItem key={cat.value} value={cat.value} className="text-xs">{cat.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         )}
 
-        <Separator orientation="vertical" className="h-8" />
+        <Separator orientation="vertical" className="h-7 mx-1" />
 
         {/* Layout Actions */}
         <Input
@@ -128,11 +174,11 @@ export const AppToolbar: React.FC = () => {
           placeholder="Layout Name"
           value={layoutName}
           onChange={handleNameChange}
-          className="w-[180px]"
+          className="w-[150px] h-9 text-xs"
         />
         <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" /> Load</Button>
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()} size="sm" className="h-9 text-xs"><Upload className="mr-1.5 h-3.5 w-3.5" /> Load File</Button>
             </TooltipTrigger>
             <TooltipContent><p>Load layout from JSON file</p></TooltipContent>
         </Tooltip>
@@ -140,29 +186,68 @@ export const AppToolbar: React.FC = () => {
         
         <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" onClick={exportLayout}><Download className="mr-2 h-4 w-4" /> Export</Button>
+              <Button variant="outline" onClick={exportLayout} size="sm" className="h-9 text-xs"><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
             </TooltipTrigger>
             <TooltipContent><p>Export current layout as JSON file</p></TooltipContent>
         </Tooltip>
 
-        <Separator orientation="vertical" className="h-8" />
+        <Separator orientation="vertical" className="h-7 mx-1" />
         
+        {/* Local Storage Actions */}
+        <div className="flex items-center gap-2">
+            <Input 
+                type="text" 
+                placeholder="Save as name..." 
+                value={saveLayoutNameInput} 
+                onChange={(e) => setSaveLayoutNameInput(e.target.value)}
+                className="w-[150px] h-9 text-xs"
+            />
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button onClick={handleSaveToStorage} size="sm" className="h-9 text-xs" variant="outline"><Save className="mr-1.5 h-3.5 w-3.5"/>Save</Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Save current layout to browser storage</p></TooltipContent>
+            </Tooltip>
+        </div>
+
+        {storedLayoutNames.length > 0 && (
+             <Select onValueChange={(value) => {
+                if (value === "__manage__") return;
+                loadLayoutFromStorage(value);
+                clearSeatSelection();
+              }}>
+              <SelectTrigger className="w-[160px] h-9 text-xs">
+                <SelectValue placeholder="Load from Browser" />
+              </SelectTrigger>
+              <SelectContent>
+                {storedLayoutNames.map(name => (
+                  <SelectItem key={name} value={name} className="text-xs">{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+        )}
+         <Tooltip>
+          <TooltipTrigger asChild>
+             <Button variant="outline" size="icon" className="h-9 w-9" onClick={refreshStoredNames}><ListRestart className="h-4 w-4"/></Button>
+          </TooltipTrigger>
+          <TooltipContent><p>Refresh saved layouts list</p></TooltipContent>
+        </Tooltip>
+
+
         {/* Sample Layouts */}
          <Select onValueChange={(value) => {
             const selectedSample = sampleLayouts.find(sl => sl.name === value);
             if (selectedSample) {
               loadLayout(JSON.parse(JSON.stringify(selectedSample))); // Deep copy
-              setLayoutName(selectedSample.name);
-              setRows(selectedSample.rows);
-              setCols(selectedSample.cols);
+              clearSeatSelection();
             }
           }}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Load Sample Layout" />
+          <SelectTrigger className="w-[150px] h-9 text-xs">
+            <SelectValue placeholder="Load Sample" />
           </SelectTrigger>
           <SelectContent>
             {sampleLayouts.map(sl => (
-              <SelectItem key={sl.name} value={sl.name}>{sl.name}</SelectItem>
+              <SelectItem key={sl.name} value={sl.name} className="text-xs">{sl.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -170,14 +255,14 @@ export const AppToolbar: React.FC = () => {
         {/* Settings Popover */}
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="icon"><Settings /></Button>
+            <Button variant="outline" size="icon" className="h-9 w-9"><Settings className="h-4 w-4" /></Button>
           </PopoverTrigger>
           <PopoverContent className="w-80">
             <div className="grid gap-4">
               <div className="space-y-2">
                 <h4 className="font-medium leading-none">Dimensions</h4>
                 <p className="text-sm text-muted-foreground">
-                  Set the number of rows and columns for a new layout.
+                  Set rows and columns for a new layout. This will clear the current layout.
                 </p>
               </div>
               <div className="grid gap-2">
@@ -195,6 +280,80 @@ export const AppToolbar: React.FC = () => {
           </PopoverContent>
         </Popover>
       </div>
+      
+      {/* Delete Confirmation Dialog */}
+      {storedLayoutNames.length > 0 && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-9 text-xs mt-2 ml-3">Manage Saved</Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+              <Command>
+                <CommandInput placeholder="Filter layouts..." className="h-9"/>
+                <CommandList>
+                  <CommandEmpty>No results found.</CommandEmpty>
+                  <CommandGroup heading="Saved Layouts">
+                    {storedLayoutNames.map((name) => (
+                      <CommandItem key={name} onSelect={() => setLayoutToDelete(name)} className="flex justify-between items-center">
+                        <span>{name}</span>
+                         <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" onClick={() => setLayoutToDelete(name)}>Delete</Button>
+                         </AlertDialogTrigger>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+          </PopoverContent>
+        </Popover>
+      )}
+      <AlertDialog open={!!layoutToDelete} onOpenChange={(open) => !open && setLayoutToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the layout "{layoutToDelete}" from your browser storage.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setLayoutToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteStoredLayout}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TooltipProvider>
   );
 };
+
+// ShadCN Command components (simplified for this example, typically in their own files)
+// For a real app, these would be imported from '@/components/ui/command'
+const Command: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, ...props }) => (
+  <div className={cn("flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground", className)} {...props} />
+);
+const CommandInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = ({ className, ...props }) => (
+  <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
+    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+    <Input className={cn("flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 focus-visible:ring-0 focus-visible:ring-offset-0", className)} {...props} />
+  </div>
+);
+import { Search } from 'lucide-react'; // ensure Search is imported
+const CommandList: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, ...props }) => (
+  <div className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)} {...props} />
+);
+const CommandEmpty: React.FC<React.HTMLAttributes<HTMLDivElement>> = (props) => (
+  <div className="py-6 text-center text-sm" {...props} />
+);
+const CommandGroup: React.FC<React.HTMLAttributes<HTMLDivElement> & { heading?: string }> = ({ className, heading, ...props }) => (
+  <div className={cn("overflow-hidden p-1 text-foreground", className)} {...props}>
+    {heading && <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{heading}</div>}
+    {props.children}
+  </div>
+);
+const CommandItem: React.FC<React.HTMLAttributes<HTMLDivElement> & { onSelect?: () => void }> = ({ className, onSelect, ...props }) => (
+  <div
+    className={cn("relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)}
+    onClick={onSelect} // Basic click handler for selection
+    {...props}
+  />
+);
+
