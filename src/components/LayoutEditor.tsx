@@ -11,24 +11,37 @@ export const LayoutEditor: React.FC = () => {
 
   if (!layout) return <p>Loading editor...</p>;
 
-  // This Set will store the IDs of cells that are "covered" by a preceding merged cell
   const mergedCellsToSkip = new Set<string>();
 
-  // Pre-calculate which cells to skip
-  // This logic is simplified to only merge two adjacent horizontal screen cells
-  layout.grid.forEach((rowArr, rowIndex) => {
-    for (let colIndex = 0; colIndex < rowArr.length - 1; colIndex++) {
-      const currentCell = rowArr[colIndex];
-      const nextCell = rowArr[colIndex + 1];
-      if (currentCell.type === 'screen' && nextCell.type === 'screen') {
-        // If current cell is screen and next cell is screen, nextCell will be skipped
-        // and currentCell will span. Add nextCell's ID to the skip set.
-        if (!mergedCellsToSkip.has(currentCell.id)) { // Ensure we don't double-add if S-S-S
-             mergedCellsToSkip.add(nextCell.id);
+  // Pre-calculate which cells to skip based on screen merging
+  for (let r = 0; r < layout.grid.length; r++) {
+    for (let c = 0; c < layout.grid[r].length; c++) {
+      if (mergedCellsToSkip.has(layout.grid[r][c].id)) {
+        continue; // Already marked as skipped by a previous primary screen cell
+      }
+
+      const currentCell = layout.grid[r][c];
+      if (currentCell.type === 'screen') {
+        let colSpan = 1;
+        // Calculate horizontal span
+        while (c + colSpan < layout.grid[r].length && layout.grid[r][c + colSpan].type === 'screen') {
+          mergedCellsToSkip.add(layout.grid[r][c + colSpan].id);
+          colSpan++;
+        }
+
+        // If this screen block can be double height (spans 2 rows)
+        const canBeDoubleHeight = (r + 1 < layout.grid.length);
+        if (canBeDoubleHeight) {
+          // Mark cells directly below the entire horizontal span for skipping
+          for (let i = 0; i < colSpan; i++) {
+            if (c + i < layout.grid[r + 1].length) { // check column bounds for the row below
+              mergedCellsToSkip.add(layout.grid[r + 1][c + i].id);
+            }
+          }
         }
       }
     }
-  });
+  }
 
   return (
     <Card className="flex-1 m-2 shadow-lg">
@@ -51,9 +64,8 @@ export const LayoutEditor: React.FC = () => {
               const rowLetter = String.fromCharCode('A'.charCodeAt(0) + rowIndex);
 
               return rowArr.map((cell, colIndex) => {
+                // If this cell is part of a merge and is not the primary (top-left) cell, skip rendering.
                 if (mergedCellsToSkip.has(cell.id)) {
-                  // This cell is part of a merge and is not the primary cell, so skip rendering.
-                  // We still need a key for React, but it won't render anything visible.
                   return <React.Fragment key={cell.id} />;
                 }
 
@@ -65,23 +77,32 @@ export const LayoutEditor: React.FC = () => {
 
                 let cellStyle: React.CSSProperties = {};
                 if (cell.type === 'screen') {
-                  const nextCell = rowArr[colIndex + 1];
-                  if (nextCell && nextCell.type === 'screen' && mergedCellsToSkip.has(nextCell.id)) {
-                    // This screen cell should span 2 columns
-                    cellStyle.gridColumn = 'span 2';
+                  // This cell is the primary (top-left) of a screen block. Calculate its span.
+                  let colSpan = 1;
+                  while (colIndex + colSpan < rowArr.length && rowArr[colIndex + colSpan].type === 'screen') {
+                    colSpan++;
+                  }
+                  cellStyle.gridColumn = `span ${colSpan}`;
+
+                  // Check if it should span 2 rows
+                  if (rowIndex + 1 < layout.grid.length) {
+                     // Check if all cells in the potential span area below are indeed part of the merge target
+                     // This simplified check assumes if a row below exists, we attempt double height.
+                     // The `mergedCellsToSkip` pre-calculation handles the actual skipping.
+                     cellStyle.gridRow = 'span 2';
                   }
                 }
 
                 return (
                   <GridCell
-                    key={cell.id} // Ensure key is always cell.id
+                    key={cell.id}
                     cell={cell}
                     seatNumber={currentSeatNumberDisplay}
                     onClick={() => updateCell(rowIndex, colIndex)}
                     isEditorCell
                     aria-rowindex={rowIndex + 1}
                     aria-colindex={colIndex + 1}
-                    style={cellStyle} // Apply the style for spanning
+                    style={cellStyle}
                   />
                 );
               });
