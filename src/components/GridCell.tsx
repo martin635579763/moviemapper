@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { SeatIcon } from './icons/SeatIcon';
 import { ScreenIcon } from './icons/ScreenIcon';
 import { AisleIcon } from './icons/AisleIcon';
-import { Accessible } from 'lucide-react';
+import { Accessibility } from 'lucide-react';
 
 interface GridCellProps extends HTMLAttributes<HTMLButtonElement> {
   cell: CellData;
@@ -43,7 +43,7 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, isEditorCell = false, 
         isPreviewCell && currentPreviewMode === 'screen-view' && cell.hasGoodView && 'ring-2 ring-green-500',
         isPreviewCell && currentPreviewMode === 'screen-view' && !cell.hasGoodView && cell.isOccluded && 'opacity-30 bg-red-500/30'
       );
-      content = cell.category === 'accessible' ? <Accessible className="w-3/4 h-3/4" /> : <SeatIcon className="w-3/4 h-3/4" />;
+      content = cell.category === 'accessible' ? <Accessibility className="w-3/4 h-3/4" /> : <SeatIcon className="w-3/4 h-3/4" />;
       break;
     case 'aisle':
       cellStyle = "bg-muted/30";
