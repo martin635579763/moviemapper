@@ -1,7 +1,7 @@
 
 import type { HTMLAttributes } from 'react';
 import React from 'react';
-import Image from 'next/image'; // Re-added import
+// import Image from 'next/image'; // No longer needed for screen preview here
 import type { CellData, SeatCategory, SeatStatus } from '@/types/layout';
 import { cn } from '@/lib/utils';
 import { SeatIcon } from './icons/SeatIcon';
@@ -92,29 +92,8 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
       content = isEditorCell || isPreviewCell ? <AisleIcon className="w-1/2 h-1/2 text-muted-foreground" /> : null;
       break;
     case 'screen':
-      cellDynamicStyle = "bg-foreground/80 text-background"; // Default style for editor
-      if (isPreviewCell) {
-        // For preview, revert to showing an image for the screen
-        content = (
-          <div className="relative w-full h-full">
-            <Image
-              src="https://source.unsplash.com/100x50/?cinema,screen" // Or a more specific placeholder if needed
-              alt="Cinema Screen Preview"
-              fill
-              sizes="100px" // Provide a reasonable size hint
-              className="object-cover"
-              data-ai-hint="cinema screen"
-            />
-          </div>
-        );
-        // For preview, the cellDynamicStyle might need adjustment if the image itself doesn't fill or if you want a specific background
-        // For now, let's assume the image covers the cell.
-        // If you want a background behind/around the image, you can set cellDynamicStyle here:
-        // cellDynamicStyle = "bg-black"; // For example
-      } else {
-        // For editor, use the icon
-        content = <ScreenIcon className="w-3/4 h-3/4" />;
-      }
+      cellDynamicStyle = "bg-foreground/80 text-background"; // Default style for editor and now also for preview
+      content = <ScreenIcon className="w-3/4 h-3/4" />; // Use icon for both editor and preview
       break;
     case 'empty':
     default:
@@ -151,7 +130,7 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
   }
 
   // This renders non-clickable preview cells (like aisles, empty, or sold seats)
-  // and also preview screen cells.
+  // and also preview screen cells (which now just show the icon).
   return (
     <div className={combinedClassName} title={`Cell ${cell.id}, type ${cell.type}${seatNumber ? `, seat ${seatNumber}` : ''}${cell.status ? `, status ${cell.status}` : ''}`}>
       {content}

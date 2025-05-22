@@ -35,9 +35,6 @@ export const LayoutPreview: React.FC = () => {
     toggleSeatSelection(rowIndex, colIndex);
   };
 
-  // Removed mergedCellsToSkip and related logic for horizontal screen merging in preview as a troubleshooting step.
-  // Screens will render as individual cells.
-
   return (
     <Card className="h-full flex flex-col m-2 shadow-lg">
       <CardHeader>
@@ -79,16 +76,11 @@ export const LayoutPreview: React.FC = () => {
               const rowLetter = String.fromCharCode('A'.charCodeAt(0) + rowIndex);
 
               return rowArr.map((cell, colIndex) => {
-                // Removed mergedCellsToSkip.has(cell.id) check
-
                 let currentSeatNumberDisplay: string | undefined = undefined;
                 if (cell.type === 'seat') {
                   seatInRowCount++;
                   currentSeatNumberDisplay = `${rowLetter}${seatInRowCount}`;
                 }
-
-                const cellStyle: React.CSSProperties = {};
-                // Removed style adjustment for cell.type === 'screen' (gridColumn span)
 
                 return (
                   <GridCell
@@ -101,7 +93,6 @@ export const LayoutPreview: React.FC = () => {
                     aria-rowindex={rowIndex + 1}
                     aria-colindex={colIndex + 1}
                     className="min-w-[10px] min-h-[10px]"
-                    style={cellStyle} // cellStyle will be empty for screens now
                   />
                 );
               });
