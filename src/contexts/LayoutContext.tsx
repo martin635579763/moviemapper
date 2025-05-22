@@ -24,7 +24,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     initializeLayout(DEFAULT_ROWS, DEFAULT_COLS);
   }, [initializeLayout]);
 
-  const updateCell = (row: number, col: number) => {
+  const updateCell = useCallback((row: number, col: number) => {
     setLayout(prevLayout => {
       const newGrid = prevLayout.grid.map(r => r.map(c => ({ ...c })));
       const cell = newGrid[row][col];
@@ -64,7 +64,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       }
       return { ...prevLayout, grid: newGrid, screenCellIds: newScreenCellIds };
     });
-  };
+  }, [selectedTool, selectedSeatCategory]); // setLayout is stable and not needed as dependency
   
   const loadLayout = (newLayout: HallLayout) => {
     try {
@@ -96,7 +96,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
 
   const calculatePreview = useCallback(() => {
     setLayout(prevLayout => calculatePreviewStates(prevLayout));
-  }, []);
+  }, []); // calculatePreviewStates is stable, setLayout is stable
 
   useEffect(() => {
     if (previewMode !== 'normal') {
