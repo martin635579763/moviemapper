@@ -1,16 +1,16 @@
 
 "use client";
 
-import { useAuthContext } from '@/contexts/AuthContext';
+// import { useAuthContext } from '@/contexts/AuthContext'; // Removed
 import { sampleFilms } from '@/data/films';
 import { FilmCard } from '@/components/FilmCard';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Settings, LogIn, LogOut, UserCog } from 'lucide-react';
+import { Settings, UserCog } from 'lucide-react'; // LogIn, LogOut removed
 
 
 export default function HomePage() {
-  const { isManager, loginAsManager, logoutManager } = useAuthContext();
+  // const { isManager, loginAsManager, logoutManager } = useAuthContext(); // Removed
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 text-foreground p-4 sm:p-6 md:p-8">
@@ -19,7 +19,14 @@ export default function HomePage() {
           Now Showing
         </h1>
         <div className="flex items-center gap-2">
-          {isManager ? (
+          {/* Simplified to always show Layout Editor link */}
+          <Button asChild variant="outline">
+            <Link href="/editor">
+              <UserCog className="mr-2 h-4 w-4" /> Layout Editor
+            </Link>
+          </Button>
+          {/* Removed login/logout logic */}
+          {/* {isManager ? (
             <>
               <Button asChild variant="outline">
                 <Link href="/editor">
@@ -34,7 +41,7 @@ export default function HomePage() {
             <Button variant="outline" onClick={loginAsManager}>
               <LogIn className="mr-2 h-4 w-4" /> Manager Login
             </Button>
-          )}
+          )} */}
         </div>
       </header>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
