@@ -2,7 +2,7 @@
 "use client";
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { HallLayout, CellData, EditorTool, SeatCategory, PreviewMode, LayoutContextType, SeatStatus } from '@/types/layout';
+import type { HallLayout, CellData, EditorTool, SeatCategory, PreviewMode, LayoutContextType } from '@/types/layout'; // SeatStatus removed
 import { createDefaultLayout, calculatePreviewStates, DEFAULT_ROWS, DEFAULT_COLS } from '@/lib/layout-utils';
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,13 +16,13 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
   const [selectedTool, setSelectedTool] = useState<EditorTool>('seat');
   const [selectedSeatCategory, setSelectedSeatCategory] = useState<SeatCategory>('standard');
   const [previewMode, setPreviewMode] = useState<PreviewMode>('normal');
-  const [selectedSeatsForPurchase, setSelectedSeatsForPurchase] = useState<CellData[]>([]);
+  // const [selectedSeatsForPurchase, setSelectedSeatsForPurchase] = useState<CellData[]>([]); // Removed
   const { toast } = useToast();
 
   const initializeLayout = useCallback((rows: number, cols: number, name?: string) => {
     setLayout(createDefaultLayout(rows, cols, name));
-    setSelectedSeatsForPurchase([]);
-  }, [setSelectedSeatsForPurchase]);
+    // setSelectedSeatsForPurchase([]); // Removed
+  }, []); // setSelectedSeatsForPurchase removed from deps
 
   useEffect(() => {
     initializeLayout(DEFAULT_ROWS, DEFAULT_COLS);
@@ -38,37 +38,38 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
         newScreenCellIds = newScreenCellIds.filter(id => id !== cell.id);
       }
       
-      if (cell.type === 'seat' && selectedTool !== 'seat' && selectedTool !== 'select') {
-        delete cell.status;
-        setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id));
-      }
+      // Removed status-related logic for seat deselection if tool changes
+      // if (cell.type === 'seat' && selectedTool !== 'seat' && selectedTool !== 'select') {
+      //   delete cell.status;
+      //   setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id));
+      // }
       
       switch (selectedTool) {
         case 'seat':
           cell.type = 'seat';
           cell.category = selectedSeatCategory;
-          cell.status = 'available';
+          // delete cell.status; // No status to manage
           break;
         case 'aisle':
           cell.type = 'aisle';
           delete cell.category;
-          delete cell.status;
-          setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id));
+          // delete cell.status; // No status to manage
+          // setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id)); // Removed
           break;
         case 'screen':
           cell.type = 'screen';
           delete cell.category;
-          delete cell.status;
+          // delete cell.status; // No status to manage
           if (!newScreenCellIds.includes(cell.id)) {
             newScreenCellIds.push(cell.id);
           }
-          setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id));
+          // setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id)); // Removed
           break;
         case 'eraser':
           cell.type = 'empty';
           delete cell.category;
-          delete cell.status;
-          setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id));
+          // delete cell.status; // No status to manage
+          // setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id)); // Removed
           break;
         case 'select':
           if (cell.type === 'seat') {
@@ -78,47 +79,29 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
           }
           break;
       }
-      // If preview mode is active, new layout includes preview states
-      // const layoutToSet = previewMode !== 'normal' ? calculatePreviewStates({ ...prevLayout, grid: newGrid, screenCellIds: newScreenCellIds }) : { ...prevLayout, grid: newGrid, screenCellIds: newScreenCellIds };
-      // return layoutToSet;
-      // Simplified: Let LayoutPreview handle deriving preview states for rendering
       return { ...prevLayout, grid: newGrid, screenCellIds: newScreenCellIds };
     });
-  }, [selectedTool, selectedSeatCategory, setSelectedSeatsForPurchase]);
+  }, [selectedTool, selectedSeatCategory]); // setSelectedSeatsForPurchase removed from deps
   
   const loadLayout = useCallback((newLayout: HallLayout) => {
     try {
       if (!newLayout || !newLayout.grid || !newLayout.rows || !newLayout.cols) {
         throw new Error("Invalid layout structure.");
       }
-      const layoutWithStatuses = {
-        ...newLayout,
-        grid: newLayout.grid.map(row => row.map(cell => {
-          if (cell.type === 'seat' && !cell.status) {
-            return { ...cell, status: 'available' as SeatStatus };
-          }
-          return cell;
-        }))
-      };
-      // If preview mode is active, new layout includes preview states
-      // const layoutToSet = previewMode !== 'normal' ? calculatePreviewStates(layoutWithStatuses) : layoutWithStatuses;
-      // setLayout(layoutToSet);
-      // Simplified: Let LayoutPreview handle deriving preview states for rendering
-      setLayout(layoutWithStatuses);
-      setSelectedSeatsForPurchase([]);
+      // Removed logic that added default status to seats
+      setLayout(newLayout);
+      // setSelectedSeatsForPurchase([]); // Removed
       toast({ title: "Success", description: `Layout "${newLayout.name}" loaded.` });
     } catch (error) {
       console.error("Failed to load layout:", error);
       toast({ variant: "destructive", title: "Error", description: "Failed to load layout file. Ensure it's a valid JSON." });
     }
-  }, [toast, setSelectedSeatsForPurchase]);
+  }, [toast]); // setSelectedSeatsForPurchase removed from deps
 
   const exportLayout = () => {
-    // Export the base layout, without preview-specific ephemeral states like isOccluded
     const layoutToExport = { ...layout };
-    // Optionally, clean ephemeral preview states from grid cells if they were ever stored
     layoutToExport.grid = layoutToExport.grid.map(row => row.map(cell => {
-        const { isOccluded, hasGoodView, ...restOfCell } = cell;
+        const { isOccluded, hasGoodView, ...restOfCell } = cell; // status would be naturally excluded if not in CellData
         return restOfCell;
     }))
 
@@ -153,9 +136,8 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     }
     
     const layoutToSave = { ...layout, name: saveName };
-    // Clean ephemeral preview states before saving
     layoutToSave.grid = layoutToSave.grid.map(row => row.map(cell => {
-        const { isOccluded, hasGoodView, ...restOfCell } = cell;
+        const { isOccluded, hasGoodView, ...restOfCell } = cell; // status naturally excluded
         return restOfCell;
     }));
 
@@ -192,56 +174,8 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Success", description: `Layout "${layoutName}" deleted from browser.` });
   }, [getStoredLayoutNames, toast]);
 
-  const toggleSeatSelection = useCallback((row: number, col: number) => {
-    setLayout(prevLayout => {
-      const newGrid = prevLayout.grid.map(r => r.map(c => ({ ...c })));
-      const cell = newGrid[row][col];
-
-      if (cell.type === 'seat') {
-        if (cell.status === 'available') {
-          cell.status = 'selected';
-          setSelectedSeatsForPurchase(prevSelected => [...prevSelected, cell]);
-        } else if (cell.status === 'selected') {
-          cell.status = 'available';
-          setSelectedSeatsForPurchase(prevSelected => prevSelected.filter(s => s.id !== cell.id));
-        }
-      }
-      // const layoutToSet = previewMode !== 'normal' ? calculatePreviewStates({ ...prevLayout, grid: newGrid }) : { ...prevLayout, grid: newGrid };
-      // return layoutToSet;
-      return { ...prevLayout, grid: newGrid };
-    });
-  }, [setSelectedSeatsForPurchase]);
-
-  const confirmTicketPurchase = useCallback(() => {
-    setLayout(prevLayout => {
-      const newGrid = prevLayout.grid.map(r => r.map(c => {
-        if (c.type === 'seat' && c.status === 'selected') {
-          return { ...c, status: 'sold' as SeatStatus };
-        }
-        return c;
-      }));
-      // const layoutToSet = previewMode !== 'normal' ? calculatePreviewStates({ ...prevLayout, grid: newGrid }) : { ...prevLayout, grid: newGrid };
-      // return layoutToSet;
-      return { ...prevLayout, grid: newGrid };
-    });
-    setSelectedSeatsForPurchase([]);
-    toast({ title: "Purchase Confirmed", description: "Selected seats are now marked as sold." });
-  }, [setSelectedSeatsForPurchase, toast]);
-  
-  const clearSeatSelection = useCallback(() => {
-     setLayout(prevLayout => {
-      const newGrid = prevLayout.grid.map(r => r.map(c => {
-        if (c.type === 'seat' && c.status === 'selected') {
-          return { ...c, status: 'available' as SeatStatus };
-        }
-        return c;
-      }));
-      // const layoutToSet = previewMode !== 'normal' ? calculatePreviewStates({ ...prevLayout, grid: newGrid }) : { ...prevLayout, grid: newGrid };
-      // return layoutToSet;
-      return { ...prevLayout, grid: newGrid };
-    });
-    setSelectedSeatsForPurchase([]);
-  }, [setSelectedSeatsForPurchase]);
+  // All ticket purchasing related functions removed:
+  // toggleSeatSelection, confirmTicketPurchase, clearSeatSelection
 
   return (
     <LayoutContext.Provider value={{
@@ -251,9 +185,8 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       previewMode, setPreviewMode,
       initializeLayout, updateCell,
       loadLayout, exportLayout,
-      // calculatePreview removed
       saveLayoutToStorage, loadLayoutFromStorage, deleteStoredLayout, getStoredLayoutNames,
-      selectedSeatsForPurchase, toggleSeatSelection, confirmTicketPurchase, clearSeatSelection
+      // selectedSeatsForPurchase, toggleSeatSelection, confirmTicketPurchase, clearSeatSelection // Removed
     }}>
       {children}
     </LayoutContext.Provider>

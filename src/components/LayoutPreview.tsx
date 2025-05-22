@@ -7,23 +7,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { ScrollArea } from './ui/scroll-area';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
-import { Button } from '@/components/ui/button';
-import type { PreviewMode, SeatStatus } from '@/types/layout';
-import { Ticket } from 'lucide-react';
+// import { Button } from '@/components/ui/button'; // No longer needed for purchase button
+import type { PreviewMode } from '@/types/layout'; // SeatStatus removed
+// import { Ticket } from 'lucide-react'; // No longer needed
 import { calculatePreviewStates } from '@/lib/layout-utils';
 
 export const LayoutPreview: React.FC = () => {
-  const { layout, previewMode, setPreviewMode, toggleSeatSelection, selectedSeatsForPurchase, confirmTicketPurchase, clearSeatSelection } = useLayoutContext();
+  const { layout, previewMode, setPreviewMode /*, toggleSeatSelection, selectedSeatsForPurchase, confirmTicketPurchase, clearSeatSelection - Removed */ } = useLayoutContext();
 
   const displayedGrid = useMemo(() => {
     if (!layout) return [];
     if (previewMode === 'normal') {
-      return layout.grid.map(row => row.map(cell => {
-        if (cell.type === 'seat' && !cell.status) {
-          return { ...cell, status: 'available' as SeatStatus };
-        }
-        return cell;
-      }));
+      // Removed status defaulting logic
+      return layout.grid;
     }
     const previewLayout = calculatePreviewStates(layout);
     return previewLayout.grid;
@@ -31,9 +27,9 @@ export const LayoutPreview: React.FC = () => {
 
   if (!layout) return <p>Loading preview...</p>;
 
-  const handleSeatClick = (rowIndex: number, colIndex: number) => {
-    toggleSeatSelection(rowIndex, colIndex);
-  };
+  // const handleSeatClick = (rowIndex: number, colIndex: number) => { // Removed
+  //   toggleSeatSelection(rowIndex, colIndex);
+  // };
 
   return (
     <Card className="h-full flex flex-col m-2 shadow-lg">
@@ -81,6 +77,12 @@ export const LayoutPreview: React.FC = () => {
                   seatInRowCount++;
                   currentSeatNumberDisplay = `${rowLetter}${seatInRowCount}`;
                 }
+                
+                // Simplified onPreviewClick - it won't do selection anymore
+                const onCellPreviewClick = cell.type === 'seat' 
+                  ? () => { /* console.log('Seat clicked, but selection logic removed'); */ } 
+                  : undefined;
+
 
                 return (
                   <GridCell
@@ -89,7 +91,7 @@ export const LayoutPreview: React.FC = () => {
                     seatNumber={currentSeatNumberDisplay}
                     isPreviewCell
                     currentPreviewMode={previewMode}
-                    onPreviewClick={cell.type === 'seat' && cell.status !== 'sold' ? () => handleSeatClick(rowIndex, colIndex) : undefined}
+                    onPreviewClick={onCellPreviewClick} // Still passing, but handler is inert for selection
                     aria-rowindex={rowIndex + 1}
                     aria-colindex={colIndex + 1}
                     className="min-w-[10px] min-h-[10px]"
@@ -100,6 +102,8 @@ export const LayoutPreview: React.FC = () => {
           </div>
         </ScrollArea>
       </CardContent>
+      {/* Removed CardFooter with ticket purchase UI */}
+      {/* 
       <CardFooter className="p-3 border-t flex-col items-start gap-2">
         <div className="flex justify-between w-full items-center">
             <p className="text-sm font-medium">
@@ -117,6 +121,7 @@ export const LayoutPreview: React.FC = () => {
           </Button>
         )}
       </CardFooter>
+      */}
     </Card>
   );
 };

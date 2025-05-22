@@ -3,14 +3,13 @@ export type CellType = 'empty' | 'seat' | 'aisle' | 'screen';
 export type SeatCategory = 'standard' | 'premium' | 'accessible' | 'loveseat';
 export type EditorTool = 'select' | 'seat' | 'aisle' | 'screen' | 'eraser';
 export type PreviewMode = 'normal' | 'screen-view' | 'occlusion';
-export type SeatStatus = 'available' | 'selected' | 'sold';
+// export type SeatStatus = 'available' | 'selected' | 'sold'; // Removed
 
 export interface CellData {
   id: string; // e.g., "r0c0"
   type: CellType;
   category?: SeatCategory; // For seats
-  status?: SeatStatus; // For seats in ticket selling demo
-  // isOccluded and hasGoodView are primarily for rendering in preview and might not be persisted in core layout state
+  // status?: SeatStatus; // For seats in ticket selling demo - Removed
   isOccluded?: boolean; 
   hasGoodView?: boolean; 
 }
@@ -36,15 +35,15 @@ export interface LayoutContextType {
   updateCell: (row: number, col: number) => void;
   loadLayout: (newLayout: HallLayout) => void;
   exportLayout: () => void;
-  // calculatePreview removed from context as it's handled differently now
 
   saveLayoutToStorage: (saveName: string) => boolean;
   loadLayoutFromStorage: (layoutName: string) => void;
   deleteStoredLayout: (layoutName: string) => void;
   getStoredLayoutNames: () => string[];
 
-  selectedSeatsForPurchase: CellData[];
-  toggleSeatSelection: (row: number, col: number) => void;
-  confirmTicketPurchase: () => void;
-  clearSeatSelection: () => void;
+  // Removed ticket purchasing related functions and state
+  // selectedSeatsForPurchase: CellData[];
+  // toggleSeatSelection: (row: number, col: number) => void;
+  // confirmTicketPurchase: () => void;
+  // clearSeatSelection: () => void;
 }

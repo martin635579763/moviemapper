@@ -1,8 +1,7 @@
 
 import type { HTMLAttributes } from 'react';
 import React from 'react';
-// import Image from 'next/image'; // No longer needed for screen preview here
-import type { CellData, SeatCategory, SeatStatus } from '@/types/layout';
+import type { CellData, SeatCategory } from '@/types/layout'; // SeatStatus removed
 import { cn } from '@/lib/utils';
 import { SeatIcon } from './icons/SeatIcon';
 import { ScreenIcon } from './icons/ScreenIcon';
@@ -15,12 +14,12 @@ interface GridCellProps extends HTMLAttributes<HTMLButtonElement> {
   isEditorCell?: boolean;
   isPreviewCell?: boolean;
   currentPreviewMode?: 'normal' | 'screen-view' | 'occlusion';
-  onPreviewClick?: () => void; // For ticket selection
+  onPreviewClick?: () => void; // Still here, but won't do selection
 }
 
-const getSeatColorAndStyle = (category?: SeatCategory, status?: SeatStatus) => {
+const getSeatColorAndStyle = (category?: SeatCategory /*, status?: SeatStatus - Removed */) => {
   let colorClass = '';
-  let statusStyle = '';
+  // let statusStyle = ''; // Removed statusStyle
 
   switch (category) {
     case 'premium':
@@ -38,41 +37,43 @@ const getSeatColorAndStyle = (category?: SeatCategory, status?: SeatStatus) => {
       break;
   }
 
-  switch (status) {
-    case 'selected':
-      statusStyle = 'ring-2 ring-offset-1 ring-offset-background ring-green-500 shadow-lg';
-      break;
-    case 'sold':
-      statusStyle = 'opacity-40 cursor-not-allowed';
-      colorClass = 'text-muted-foreground fill-muted-foreground/10'; // Muted color for sold seats
-      break;
-    case 'available':
-    default:
-      // No specific status style for available, uses base colorClass
-      break;
-  }
-  return cn(colorClass, statusStyle);
+  // Removed status switch
+  // switch (status) {
+  //   case 'selected':
+  //     statusStyle = 'ring-2 ring-offset-1 ring-offset-background ring-green-500 shadow-lg';
+  //     break;
+  //   case 'sold':
+  //     statusStyle = 'opacity-40 cursor-not-allowed';
+  //     colorClass = 'text-muted-foreground fill-muted-foreground/10';
+  //     break;
+  //   case 'available':
+  //   default:
+  //     break;
+  // }
+  return cn(colorClass /*, statusStyle - Removed */);
 };
 
 export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCell = false, isPreviewCell = false, currentPreviewMode = 'normal', className, onPreviewClick, ...props }) => {
   const baseStyle = "w-full h-full aspect-square flex items-center justify-center border border-border/50 rounded-sm transition-colors duration-150 relative overflow-hidden";
   const editorHoverStyle = isEditorCell ? "hover:bg-secondary/50" : "";
-  const previewClickableStyle = isPreviewCell && cell.type === 'seat' && cell.status !== 'sold' && onPreviewClick ? "cursor-pointer hover:brightness-110" : "";
+  // Simplified previewClickableStyle since status is gone
+  const previewClickableStyle = isPreviewCell && cell.type === 'seat' && onPreviewClick ? "cursor-pointer hover:brightness-110" : "";
   
   let content = null;
   let cellDynamicStyle = "";
 
   switch (cell.type) {
     case 'seat':
-      cellDynamicStyle = getSeatColorAndStyle(cell.category, cell.status);
+      cellDynamicStyle = getSeatColorAndStyle(cell.category /*, cell.status - Removed */);
       
-      if (isPreviewCell && currentPreviewMode === 'occlusion' && cell.isOccluded && cell.status !== 'sold') {
+      // Occlusion/view logic doesn't depend on status, so it remains
+      if (isPreviewCell && currentPreviewMode === 'occlusion' && cell.isOccluded) {
          cellDynamicStyle = cn(cellDynamicStyle, 'opacity-30 bg-red-500/30');
       }
-      if (isPreviewCell && currentPreviewMode === 'screen-view' && cell.hasGoodView && cell.status !== 'sold') {
+      if (isPreviewCell && currentPreviewMode === 'screen-view' && cell.hasGoodView) {
          cellDynamicStyle = cn(cellDynamicStyle, 'ring-2 ring-offset-1 ring-offset-background ring-sky-400');
       }
-      if (isPreviewCell && currentPreviewMode === 'screen-view' && !cell.hasGoodView && cell.isOccluded && cell.status !== 'sold') {
+      if (isPreviewCell && currentPreviewMode === 'screen-view' && !cell.hasGoodView && cell.isOccluded) {
          cellDynamicStyle = cn(cellDynamicStyle, 'opacity-30 bg-red-500/30');
       }
 
@@ -92,8 +93,8 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
       content = isEditorCell || isPreviewCell ? <AisleIcon className="w-1/2 h-1/2 text-muted-foreground" /> : null;
       break;
     case 'screen':
-      cellDynamicStyle = "bg-foreground/80 text-background"; // Default style for editor and now also for preview
-      content = <ScreenIcon className="w-3/4 h-3/4" />; // Use icon for both editor and preview
+      cellDynamicStyle = "bg-foreground/80 text-background";
+      content = <ScreenIcon className="w-3/4 h-3/4" />;
       break;
     case 'empty':
     default:
@@ -115,13 +116,14 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
     );
   }
 
-  if (isPreviewCell && cell.type === 'seat' && cell.status !== 'sold' && onPreviewClick) {
+  // Simplified preview cell for seats - no 'sold' status check
+  if (isPreviewCell && cell.type === 'seat' && onPreviewClick) {
     return (
       <button
         onClick={onPreviewClick}
-        aria-label={`Select seat ${seatNumber}, type ${cell.type}, category ${cell.category}, status ${cell.status}`}
+        aria-label={`Seat ${seatNumber}, type ${cell.type}, category ${cell.category}`} // Removed status from aria-label
         className={combinedClassName}
-        disabled={cell.status === 'sold'}
+        // disabled={cell.status === 'sold'} // Removed disabled check
         {...props}
       >
         {content}
@@ -129,10 +131,8 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
     );
   }
 
-  // This renders non-clickable preview cells (like aisles, empty, or sold seats)
-  // and also preview screen cells (which now just show the icon).
   return (
-    <div className={combinedClassName} title={`Cell ${cell.id}, type ${cell.type}${seatNumber ? `, seat ${seatNumber}` : ''}${cell.status ? `, status ${cell.status}` : ''}`}>
+    <div className={combinedClassName} title={`Cell ${cell.id}, type ${cell.type}${seatNumber ? `, seat ${seatNumber}` : ''}`}>
       {content}
     </div>
   );
