@@ -1,6 +1,7 @@
+
 import type { HTMLAttributes } from 'react';
 import React from 'react';
-import Image from 'next/image';
+// import Image from 'next/image'; // No longer needed for screen in preview
 import type { CellData, SeatCategory, SeatStatus } from '@/types/layout';
 import { cn } from '@/lib/utils';
 import { SeatIcon } from './icons/SeatIcon';
@@ -65,12 +66,11 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
     case 'seat':
       cellDynamicStyle = getSeatColorAndStyle(cell.category, cell.status);
       
-      // Occlusion and screen view styles (can be combined with status styles)
       if (isPreviewCell && currentPreviewMode === 'occlusion' && cell.isOccluded && cell.status !== 'sold') {
          cellDynamicStyle = cn(cellDynamicStyle, 'opacity-30 bg-red-500/30');
       }
       if (isPreviewCell && currentPreviewMode === 'screen-view' && cell.hasGoodView && cell.status !== 'sold') {
-         cellDynamicStyle = cn(cellDynamicStyle, 'ring-2 ring-offset-1 ring-offset-background ring-sky-400'); // Different ring for good view
+         cellDynamicStyle = cn(cellDynamicStyle, 'ring-2 ring-offset-1 ring-offset-background ring-sky-400');
       }
       if (isPreviewCell && currentPreviewMode === 'screen-view' && !cell.hasGoodView && cell.isOccluded && cell.status !== 'sold') {
          cellDynamicStyle = cn(cellDynamicStyle, 'opacity-30 bg-red-500/30');
@@ -92,20 +92,13 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
       content = isEditorCell || isPreviewCell ? <AisleIcon className="w-1/2 h-1/2 text-muted-foreground" /> : null;
       break;
     case 'screen':
-      cellDynamicStyle = "bg-foreground/80 text-background";
       if (isPreviewCell) {
-        content = (
-          <Image
-            src="https://source.unsplash.com/100x60/?movie,screen"
-            alt="Movie screen placeholder"
-            fill
-            className="object-cover"
-            sizes="100px" 
-            data-ai-hint="movie screen"
-            priority={false} 
-          />
-        );
+        // For preview, screen is a plain white/light gray block
+        cellDynamicStyle = "bg-slate-100 dark:bg-slate-300 border border-slate-300 dark:border-slate-500";
+        content = null; // No icon or image, just the styled background
       } else {
+        // For editor, use the icon
+        cellDynamicStyle = "bg-foreground/80 text-background";
         content = <ScreenIcon className="w-3/4 h-3/4" />;
       }
       break;
@@ -129,15 +122,14 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
     );
   }
 
-  // For preview cells, use a div or button based on interactivity
   if (isPreviewCell && cell.type === 'seat' && cell.status !== 'sold' && onPreviewClick) {
     return (
       <button
         onClick={onPreviewClick}
         aria-label={`Select seat ${seatNumber}, type ${cell.type}, category ${cell.category}, status ${cell.status}`}
         className={combinedClassName}
-        disabled={cell.status === 'sold'} // Should be redundant due to check above, but good practice
-        {...props} // Pass other HTMLButtonElement props
+        disabled={cell.status === 'sold'}
+        {...props}
       >
         {content}
       </button>

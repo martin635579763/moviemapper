@@ -35,6 +35,8 @@ export const LayoutPreview: React.FC = () => {
     toggleSeatSelection(rowIndex, colIndex);
   };
 
+  const mergedCellsToSkip = new Set<string>();
+
   return (
     <Card className="h-full flex flex-col m-2 shadow-lg">
       <CardHeader>
@@ -76,11 +78,26 @@ export const LayoutPreview: React.FC = () => {
               const rowLetter = String.fromCharCode('A'.charCodeAt(0) + rowIndex);
 
               return rowArr.map((cell, colIndex) => {
+                if (mergedCellsToSkip.has(cell.id)) {
+                  return <React.Fragment key={cell.id} />;
+                }
+
                 let currentSeatNumberDisplay: string | undefined = undefined;
                 if (cell.type === 'seat') {
                   seatInRowCount++;
                   currentSeatNumberDisplay = `${rowLetter}${seatInRowCount}`;
                 }
+
+                let cellStyle: React.CSSProperties = {};
+                if (cell.type === 'screen') {
+                  let colSpan = 1;
+                  while (colIndex + colSpan < rowArr.length && rowArr[colIndex + colSpan].type === 'screen') {
+                    mergedCellsToSkip.add(rowArr[colIndex + colSpan].id);
+                    colSpan++;
+                  }
+                  cellStyle.gridColumn = `span ${colSpan}`;
+                }
+
                 return (
                   <GridCell
                     key={cell.id}
@@ -92,13 +109,13 @@ export const LayoutPreview: React.FC = () => {
                     aria-rowindex={rowIndex + 1}
                     aria-colindex={colIndex + 1}
                     className="min-w-[10px] min-h-[10px]"
+                    style={cellStyle}
                   />
                 );
               });
             })}
           </div>
         </ScrollArea>
-        {/* Removed the placeholder status text for preview mode */}
       </CardContent>
       <CardFooter className="p-3 border-t flex-col items-start gap-2">
         <div className="flex justify-between w-full items-center">
