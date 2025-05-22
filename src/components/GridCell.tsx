@@ -96,11 +96,11 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
       if (isPreviewCell) {
         content = (
           <Image
-            src="https://placehold.co/100x60.png"
+            src="https://source.unsplash.com/100x60/?movie,screen"
             alt="Movie screen placeholder"
             fill
             className="object-cover"
-            sizes="100px" // A simple size for this small placeholder
+            sizes="100px" 
             data-ai-hint="movie screen"
             priority={false} 
           />
