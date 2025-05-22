@@ -7,14 +7,13 @@ import Image from 'next/image';
 import { LayoutProvider, useLayoutContext } from '@/contexts/LayoutContext';
 import { LayoutPreview } from '@/components/LayoutPreview';
 import { sampleFilms, type Film } from '@/data/films';
-import { sampleLayouts } from '@/data/sample-layouts'; // Added import
+import { sampleLayouts } from '@/data/sample-layouts';
 import type { HallLayout } from '@/types/layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, Clock, Ticket as TicketIconLucide, ChevronDown } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added imports
+import { ArrowLeft, CalendarDays, Clock, Ticket as TicketIconLucide } from 'lucide-react'; // Removed ChevronDown as it's not used directly here.
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 
 // This component will consume the LayoutContext
@@ -23,12 +22,14 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
   const [availableLayoutNames, setAvailableLayoutNames] = useState<string[]>([]);
 
   useEffect(() => {
-    // Deep copy layout to avoid modifying the original sampleLayouts array
-    // Only load if the context layout is different from the intended initialLayout or not loaded yet
-    if (initialLayout && (!layout || layout.name !== initialLayout.name)) {
-       loadLayout(JSON.parse(JSON.stringify(initialLayout)));
+    // This effect now primarily runs when initialLayout (i.e., the film) changes.
+    // It loads the film's default layout. Subsequent user selections via the dropdown
+    // will change layout in context but won't cause this effect to revert the choice,
+    // as initialLayout and loadLayout (the function) won't have changed.
+    if (initialLayout) {
+       loadLayout(JSON.parse(JSON.stringify(initialLayout))); // Deep copy
     }
-  }, [initialLayout, loadLayout, layout]);
+  }, [initialLayout, loadLayout]); // Removed `layout` from dependencies
 
   useEffect(() => {
     const sampleNames = sampleLayouts.map(l => l.name);
@@ -40,7 +41,7 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
 
 
   const handleHallSelectionChange = (selectedLayoutName: string) => {
-    if (!selectedLayoutName || selectedLayoutName === layout.name) return;
+    if (!selectedLayoutName || (layout && selectedLayoutName === layout.name)) return;
 
     const sampleLayoutToLoad = sampleLayouts.find(sl => sl.name === selectedLayoutName);
     if (sampleLayoutToLoad) {
@@ -138,9 +139,9 @@ export default function FilmPage() {
     if (!currentFilm) return { film: undefined, layoutToLoad: undefined };
     
     const associatedLayout = sampleLayouts.find(l => l.name === currentFilm.associatedLayoutName);
-    const layout = associatedLayout || sampleLayouts[0]; // Fallback to first sample layout
+    const layoutToLoad = associatedLayout || sampleLayouts[0]; // Fallback to first sample layout
 
-    return { film: currentFilm, layoutToLoad: layout };
+    return { film: currentFilm, layoutToLoad: layoutToLoad };
   }, [filmId]);
 
   const { film, layoutToLoad } = filmData;
@@ -179,4 +180,3 @@ export default function FilmPage() {
     </LayoutProvider>
   );
 }
-
