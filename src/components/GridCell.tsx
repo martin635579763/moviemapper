@@ -1,7 +1,7 @@
 
 import type { HTMLAttributes } from 'react';
 import React from 'react';
-import type { CellData, SeatCategory } from '@/types/layout'; // SeatStatus removed
+import type { CellData, SeatCategory } from '@/types/layout'; 
 import { cn } from '@/lib/utils';
 import { SeatIcon } from './icons/SeatIcon';
 import { ScreenIcon } from './icons/ScreenIcon';
@@ -14,16 +14,15 @@ interface GridCellProps extends HTMLAttributes<HTMLButtonElement> {
   isEditorCell?: boolean;
   isPreviewCell?: boolean;
   currentPreviewMode?: 'normal' | 'screen-view' | 'occlusion';
-  onPreviewClick?: () => void; // Still here, but won't do selection
+  onPreviewClick?: () => void;
+  style?: React.CSSProperties; // Explicitly define style prop
 }
 
-const getSeatColorAndStyle = (category?: SeatCategory /*, status?: SeatStatus - Removed */) => {
+const getSeatColorAndStyle = (category?: SeatCategory) => {
   let colorClass = '';
-  // let statusStyle = ''; // Removed statusStyle
-
   switch (category) {
     case 'premium':
-      colorClass = 'text-accent fill-accent/20'; // Amber
+      colorClass = 'text-accent fill-accent/20'; 
       break;
     case 'accessible':
       colorClass = 'text-blue-400 fill-blue-400/20';
@@ -33,30 +32,37 @@ const getSeatColorAndStyle = (category?: SeatCategory /*, status?: SeatStatus - 
       break;
     case 'standard':
     default:
-      colorClass = 'text-primary fill-primary/20'; // Deep Blue
+      colorClass = 'text-primary fill-primary/20'; 
       break;
   }
-
-  // Removed status switch
-  // switch (status) {
-  //   case 'selected':
-  //     statusStyle = 'ring-2 ring-offset-1 ring-offset-background ring-green-500 shadow-lg';
-  //     break;
-  //   case 'sold':
-  //     statusStyle = 'opacity-40 cursor-not-allowed';
-  //     colorClass = 'text-muted-foreground fill-muted-foreground/10';
-  //     break;
-  //   case 'available':
-  //   default:
-  //     break;
-  // }
-  return cn(colorClass /*, statusStyle - Removed */);
+  return cn(colorClass);
 };
 
-export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCell = false, isPreviewCell = false, currentPreviewMode = 'normal', className, onPreviewClick, ...props }) => {
-  const baseStyle = "w-full h-full aspect-square flex items-center justify-center border border-border/50 rounded-sm transition-colors duration-150 relative overflow-hidden";
+export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCell = false, isPreviewCell = false, currentPreviewMode = 'normal', className, onPreviewClick, style, ...props }) => {
+  
+  const baseClasses = "w-full h-full flex items-center justify-center border border-border/50 rounded-sm transition-colors duration-150 relative overflow-hidden";
+  
+  let shouldApplyAspectSquare: boolean;
+
+  if (isEditorCell) {
+    // In editor, only apply aspect-square if it's NOT a merged screen cell
+    if (cell.type === 'screen' && style && typeof style.gridColumn === 'string' && style.gridColumn.startsWith('span')) {
+      shouldApplyAspectSquare = false; // Merged screen in editor: use full width, natural height
+    } else {
+      shouldApplyAspectSquare = true; // All other editor cells (seats, aisles, single screens) are square
+    }
+  } else if (isPreviewCell) {
+    // In preview, only apply aspect-square to non-screen cells
+    if (cell.type === 'screen') {
+      shouldApplyAspectSquare = false; // Screen in preview (merged or single) is not aspect-square
+    } else {
+      shouldApplyAspectSquare = true; // Seats, aisles in preview are square
+    }
+  } else {
+    shouldApplyAspectSquare = true; // Default, though one of the above should always be true
+  }
+
   const editorHoverStyle = isEditorCell ? "hover:bg-secondary/50" : "";
-  // Simplified previewClickableStyle since status is gone
   const previewClickableStyle = isPreviewCell && cell.type === 'seat' && onPreviewClick ? "cursor-pointer hover:brightness-110" : "";
   
   let content = null;
@@ -64,9 +70,8 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
 
   switch (cell.type) {
     case 'seat':
-      cellDynamicStyle = getSeatColorAndStyle(cell.category /*, cell.status - Removed */);
+      cellDynamicStyle = getSeatColorAndStyle(cell.category);
       
-      // Occlusion/view logic doesn't depend on status, so it remains
       if (isPreviewCell && currentPreviewMode === 'occlusion' && cell.isOccluded) {
          cellDynamicStyle = cn(cellDynamicStyle, 'opacity-30 bg-red-500/30');
       }
@@ -93,8 +98,13 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
       content = isEditorCell || isPreviewCell ? <AisleIcon className="w-1/2 h-1/2 text-muted-foreground" /> : null;
       break;
     case 'screen':
-      cellDynamicStyle = "bg-foreground/80 text-background";
-      content = <ScreenIcon className="w-3/4 h-3/4" />;
+      if (isPreviewCell) {
+        cellDynamicStyle = "bg-white dark:bg-gray-700 border border-slate-300 dark:border-slate-600"; 
+        content = null; 
+      } else { // Editor cell
+        cellDynamicStyle = "bg-foreground/80 text-background";
+        content = <ScreenIcon className="w-3/4 h-3/4" />;
+      }
       break;
     case 'empty':
     default:
@@ -102,29 +112,39 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
       break;
   }
   
-  const combinedClassName = cn(baseStyle, editorHoverStyle, previewClickableStyle, cellDynamicStyle, className);
+  const combinedClassName = cn(
+    baseClasses, 
+    { 'aspect-square': shouldApplyAspectSquare }, 
+    editorHoverStyle, 
+    previewClickableStyle, 
+    cellDynamicStyle, 
+    className
+  );
+
+  const commonProps = {
+    className: combinedClassName,
+    style: style, // Apply the style from parent (for gridColumn spans)
+    ...props       // Spread other HTML attributes
+  };
 
   if (isEditorCell) {
     return (
       <button
         aria-label={`Cell ${cell.id}, type ${cell.type}${cell.category ? `, category ${cell.category}` : ''}${seatNumber ? `, seat ${seatNumber}` : ''}`}
-        className={combinedClassName}
-        {...props}
+        {...commonProps}
+        onClick={onPreviewClick || (props as any).onClick} // Ensure onClick from props is used if onPreviewClick is not there for editor
       >
         {content}
       </button>
     );
   }
 
-  // Simplified preview cell for seats - no 'sold' status check
   if (isPreviewCell && cell.type === 'seat' && onPreviewClick) {
     return (
       <button
         onClick={onPreviewClick}
-        aria-label={`Seat ${seatNumber}, type ${cell.type}, category ${cell.category}`} // Removed status from aria-label
-        className={combinedClassName}
-        // disabled={cell.status === 'sold'} // Removed disabled check
-        {...props}
+        aria-label={`Seat ${seatNumber}, type ${cell.type}, category ${cell.category}`}
+        {...commonProps}
       >
         {content}
       </button>
@@ -132,7 +152,10 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
   }
 
   return (
-    <div className={combinedClassName} title={`Cell ${cell.id}, type ${cell.type}${seatNumber ? `, seat ${seatNumber}` : ''}`}>
+    <div 
+        title={`Cell ${cell.id}, type ${cell.type}${seatNumber ? `, seat ${seatNumber}` : ''}`}
+        {...commonProps}
+    >
       {content}
     </div>
   );
