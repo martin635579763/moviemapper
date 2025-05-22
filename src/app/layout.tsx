@@ -1,9 +1,11 @@
+
 import type { Metadata } from 'next';
 // Corrected imports for Geist fonts - these are objects, not functions to call
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from '@/contexts/AuthContext'; // Added
 
 // GeistSans and GeistMono are imported as objects.
 // Their .variable property provides the CSS variable class name.
@@ -37,8 +39,10 @@ export default function RootLayout({
           in `tailwind.config.ts` to use `var(--font-geist-sans)`.
           For now, `globals.css` handles this directly.
         */}
-        {children}
-        <Toaster />
+        <AuthProvider> {/* Added Wrapper */}
+          {children}
+          <Toaster />
+        </AuthProvider> {/* Added Wrapper */}
       </body>
     </html>
   );
