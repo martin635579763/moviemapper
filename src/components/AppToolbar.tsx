@@ -22,9 +22,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
+  // AlertDialogTrigger, // Removed direct import as it's conditionally used or causing issues
 } from "@/components/ui/alert-dialog"
-import { cn } from "@/lib/utils"; // Added import for cn
+import { cn } from "@/lib/utils"; 
 
 
 const TOOLBAR_TOOLS_CONFIG: { value: EditorTool; label: string; icon: React.ElementType }[] = [
@@ -282,7 +282,7 @@ export const AppToolbar: React.FC = () => {
         </Popover>
       </div>
       
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation Dialog Trigger and Content Area */}
       {storedLayoutNames.length > 0 && (
         <Popover>
           <PopoverTrigger asChild>
@@ -297,9 +297,11 @@ export const AppToolbar: React.FC = () => {
                     {storedLayoutNames.map((name) => (
                       <CommandItem key={name} onSelect={() => setLayoutToDelete(name)} className="flex justify-between items-center">
                         <span>{name}</span>
-                         <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" onClick={() => setLayoutToDelete(name)}>Delete</Button>
-                         </AlertDialogTrigger>
+                        {/* 
+                          The AlertDialogTrigger was removed here. The Button's onClick now directly
+                          sets the state to open the AlertDialog. The AlertDialog itself is controlled.
+                        */}
+                        <Button variant="ghost" size="sm" onClick={() => setLayoutToDelete(name)}>Delete</Button>
                       </CommandItem>
                     ))}
                   </CommandGroup>
