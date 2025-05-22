@@ -18,7 +18,7 @@ import { Label } from '@/components/ui/label';
 
 // This component will consume the LayoutContext
 const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayout }> = ({ film, initialLayout }) => {
-  const { loadLayout, layout, clearSeatSelection, getStoredLayoutNames, loadLayoutFromStorage } = useLayoutContext();
+  const { loadLayout, layout, getStoredLayoutNames, loadLayoutFromStorage } = useLayoutContext(); // Removed clearSeatSelection
   const [availableLayoutNames, setAvailableLayoutNames] = useState<string[]>([]);
 
   useEffect(() => {
@@ -50,7 +50,7 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
       // If not a sample layout, assume it's a stored layout
       loadLayoutFromStorage(selectedLayoutName);
     }
-    clearSeatSelection();
+    // clearSeatSelection(); // Removed as it no longer exists
   };
 
   return (
