@@ -40,7 +40,7 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
               src={film.posterUrl}
               alt={`Poster for ${film.title}`}
               fill
-              sizes="(max-width: 1280px) 33vw, 100vw"
+              sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
               className="object-cover"
               data-ai-hint="movie poster"
               priority
