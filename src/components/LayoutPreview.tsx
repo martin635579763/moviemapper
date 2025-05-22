@@ -35,7 +35,8 @@ export const LayoutPreview: React.FC = () => {
     toggleSeatSelection(rowIndex, colIndex);
   };
 
-  const mergedCellsToSkip = new Set<string>();
+  // Removed mergedCellsToSkip and related logic for horizontal screen merging in preview as a troubleshooting step.
+  // Screens will render as individual cells.
 
   return (
     <Card className="h-full flex flex-col m-2 shadow-lg">
@@ -78,9 +79,7 @@ export const LayoutPreview: React.FC = () => {
               const rowLetter = String.fromCharCode('A'.charCodeAt(0) + rowIndex);
 
               return rowArr.map((cell, colIndex) => {
-                if (mergedCellsToSkip.has(cell.id)) {
-                  return <React.Fragment key={cell.id} />;
-                }
+                // Removed mergedCellsToSkip.has(cell.id) check
 
                 let currentSeatNumberDisplay: string | undefined = undefined;
                 if (cell.type === 'seat') {
@@ -88,15 +87,8 @@ export const LayoutPreview: React.FC = () => {
                   currentSeatNumberDisplay = `${rowLetter}${seatInRowCount}`;
                 }
 
-                let cellStyle: React.CSSProperties = {};
-                if (cell.type === 'screen') {
-                  let colSpan = 1;
-                  while (colIndex + colSpan < rowArr.length && rowArr[colIndex + colSpan].type === 'screen') {
-                    mergedCellsToSkip.add(rowArr[colIndex + colSpan].id);
-                    colSpan++;
-                  }
-                  cellStyle.gridColumn = `span ${colSpan}`;
-                }
+                const cellStyle: React.CSSProperties = {};
+                // Removed style adjustment for cell.type === 'screen' (gridColumn span)
 
                 return (
                   <GridCell
@@ -109,7 +101,7 @@ export const LayoutPreview: React.FC = () => {
                     aria-rowindex={rowIndex + 1}
                     aria-colindex={colIndex + 1}
                     className="min-w-[10px] min-h-[10px]"
-                    style={cellStyle}
+                    style={cellStyle} // cellStyle will be empty for screens now
                   />
                 );
               });
