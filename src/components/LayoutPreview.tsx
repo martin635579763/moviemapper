@@ -23,7 +23,7 @@ export const LayoutPreview: React.FC = () => {
   return (
     <Card className="h-full flex flex-col m-2 shadow-lg">
       <CardHeader>
-        <CardTitle>Layout Preview: {layout.name}</CardTitle>
+        <CardTitle>{layout.name}</CardTitle> {/* Changed this line */}
       </CardHeader>
       <CardContent className="flex flex-col flex-1 p-4 pt-0 overflow-hidden">
         <div className="mb-3">
