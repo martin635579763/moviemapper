@@ -13,7 +13,7 @@ export const LayoutEditor: React.FC = () => {
 
   const mergedCellsToSkip = new Set<string>();
 
-  // Pre-calculate which cells to skip based on screen merging
+  // Pre-calculate which cells to skip based on horizontal screen merging
   for (let r = 0; r < layout.grid.length; r++) {
     for (let c = 0; c < layout.grid[r].length; c++) {
       if (mergedCellsToSkip.has(layout.grid[r][c].id)) {
@@ -28,17 +28,7 @@ export const LayoutEditor: React.FC = () => {
           mergedCellsToSkip.add(layout.grid[r][c + colSpan].id);
           colSpan++;
         }
-
-        // If this screen block can be double height (spans 2 rows)
-        const canBeDoubleHeight = (r + 1 < layout.grid.length);
-        if (canBeDoubleHeight) {
-          // Mark cells directly below the entire horizontal span for skipping
-          for (let i = 0; i < colSpan; i++) {
-            if (c + i < layout.grid[r + 1].length) { // check column bounds for the row below
-              mergedCellsToSkip.add(layout.grid[r + 1][c + i].id);
-            }
-          }
-        }
+        // No vertical skipping logic needed anymore for single-height screens
       }
     }
   }
@@ -77,20 +67,13 @@ export const LayoutEditor: React.FC = () => {
 
                 let cellStyle: React.CSSProperties = {};
                 if (cell.type === 'screen') {
-                  // This cell is the primary (top-left) of a screen block. Calculate its span.
+                  // This cell is the primary (top-left) of a screen block. Calculate its horizontal span.
                   let colSpan = 1;
                   while (colIndex + colSpan < rowArr.length && rowArr[colIndex + colSpan].type === 'screen') {
                     colSpan++;
                   }
                   cellStyle.gridColumn = `span ${colSpan}`;
-
-                  // Check if it should span 2 rows
-                  if (rowIndex + 1 < layout.grid.length) {
-                     // Check if all cells in the potential span area below are indeed part of the merge target
-                     // This simplified check assumes if a row below exists, we attempt double height.
-                     // The `mergedCellsToSkip` pre-calculation handles the actual skipping.
-                     cellStyle.gridRow = 'span 2';
-                  }
+                  // No gridRow span needed for single-height screens
                 }
 
                 return (
