@@ -21,11 +21,11 @@ export default function HomePage() {
         <div className="flex items-center gap-2">
           {isManager ? (
             <>
-              <Link href="/editor" passHref legacyBehavior>
-                <Button variant="outline">
+              <Button asChild variant="outline">
+                <Link href="/editor">
                   <UserCog className="mr-2 h-4 w-4" /> Layout Editor
-                </Button>
-              </Link>
+                </Link>
+              </Button>
               <Button variant="ghost" onClick={logoutManager} size="sm">
                 <LogOut className="mr-2 h-4 w-4" /> Logout
               </Button>

@@ -23,7 +23,7 @@ export const FilmCard: React.FC<FilmCardProps> = ({ film }) => {
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
               className="object-cover rounded-t-lg group-hover:scale-105 transition-transform duration-300"
-              data-ai-hint="movie poster"
+              data-ai-hint={film.genre.split(',')[0].toLowerCase().replace(/\s+/g, '') || "movie"}
             />
           </div>
         </Link>
@@ -35,12 +35,12 @@ export const FilmCard: React.FC<FilmCardProps> = ({ film }) => {
         <p className="text-xs text-muted-foreground mb-2">{film.genre} &bull; {film.duration}</p>
         <p className="text-sm text-foreground line-clamp-3 flex-grow mb-3">{film.description}</p>
       </CardContent>
-      <CardFooter className="p-4 border-t mt-auto">
-        <Link href={`/film/${film.id}`} passHref legacyBehavior className="w-full">
-          <Button className="w-full">
+      <CardFooter className="p-4 border-t mt-auto w-full">
+        <Button asChild className="w-full">
+          <Link href={`/film/${film.id}`}>
             <Ticket className="mr-2 h-4 w-4" /> Get Tickets
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </CardFooter>
     </Card>
   );

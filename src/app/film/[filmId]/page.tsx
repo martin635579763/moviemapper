@@ -156,11 +156,11 @@ export default function FilmPage() {
             <TicketIconLucide className="w-16 h-16 text-primary mb-4 animate-pulse" />
             <h1 className="text-2xl font-semibold mb-2">Loading Film Details...</h1>
             <p className="text-muted-foreground mb-6">Or, this film might not exist or its layout is missing.</p>
-            <Link href="/" passHref>
-                <Button variant="outline">
+            <Button asChild variant="outline">
+                <Link href="/">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Films
-                </Button>
-            </Link>
+                </Link>
+            </Button>
         </div>
     );
   }
@@ -169,11 +169,11 @@ export default function FilmPage() {
     <LayoutProvider key={filmId}> 
        <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 text-foreground">
         <div className="p-4 md:p-6 sticky top-0 bg-background/80 backdrop-blur-md z-50 shadow-sm">
-            <Link href="/" passHref>
-                <Button variant="ghost" size="sm">
+            <Button asChild variant="ghost" size="sm">
+                <Link href="/">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Films
-                </Button>
-            </Link>
+                </Link>
+            </Button>
         </div>
         <FilmTicketBookingInterface film={film} initialLayout={layoutToLoad} />
        </div>
