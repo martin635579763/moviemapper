@@ -7,13 +7,10 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Ticket } from 'lucide-react';
 
-interface FilmCardProps {
-  film: Film;
-}
-
-const generateDataAiHint = (genre: string): string => {
-  return genre.toLowerCase().split(',').map(g => g.trim().replace(/\s+/g, '')).slice(0, 2).join(' ') || "movie";
-};
+// generateDataAiHint is no longer needed here as the poster is specific.
+// const generateDataAiHint = (genre: string): string => {
+//   return genre.toLowerCase().split(',').map(g => g.trim().replace(/\s+/g, '')).slice(0, 2).join(' ') || "movie";
+// };
 
 export const FilmCard: React.FC<FilmCardProps> = ({ film }) => {
   return (
@@ -27,7 +24,7 @@ export const FilmCard: React.FC<FilmCardProps> = ({ film }) => {
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
               className="object-cover rounded-t-lg group-hover:scale-105 transition-transform duration-300"
-              data-ai-hint={generateDataAiHint(film.genre)}
+              data-ai-hint="movie poster" // Generic hint for specific poster
             />
           </div>
         </Link>

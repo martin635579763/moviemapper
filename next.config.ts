@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'source.unsplash.com', // Added this entry
+        hostname: 'source.unsplash.com',
         port: '',
         pathname: '/**',
       },
@@ -31,8 +31,14 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
       {
-        protocol: 'https', // Added for placehold.co as it's used in GridCell
+        protocol: 'https',
         hostname: 'placehold.co',
+        port: '',
+        pathname: '/**',
+      },
+      { // Added for TMDB
+        protocol: 'https',
+        hostname: 'image.tmdb.org',
         port: '',
         pathname: '/**',
       }

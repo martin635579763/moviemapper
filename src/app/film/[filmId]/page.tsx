@@ -62,7 +62,7 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
               className="object-cover"
-              data-ai-hint={generateDataAiHint(film.genre)}
+              data-ai-hint="movie poster" // Generic hint for specific poster
               priority
             />
           </div>
