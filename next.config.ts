@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -25,6 +26,12 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'source.unsplash.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.pexels.com', // Added Pexels
         port: '',
         pathname: '/**',
       },
