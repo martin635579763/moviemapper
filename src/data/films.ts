@@ -37,7 +37,7 @@ const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
       getDetailImageUnsplashUrl('spaceship,cockpit', 600, 400),
       getDetailImageUnsplashUrl('alien,planet', 600, 400),
     ],
-    associatedLayoutName: 'Standard Cinema',
+    associatedLayoutName: 'Standard Cinema', // This remains as a fallback if no schedule directs elsewhere
     duration: "2h 30m",
     genre: "Sci-Fi, Adventure",
   },
@@ -102,34 +102,30 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
     }
   }
 
-  const sampleLayoutNames = staticSampleLayouts.map(l => l.name);
-  const allAvailableHallNames = Array.from(new Set([...sampleLayoutNames, ...storedLayoutNames]));
+  // Use ONLY stored layout names for dynamic schedule generation
+  const allAvailableHallNames = Array.from(new Set([...storedLayoutNames]));
 
   return BASE_FILM_DATA.map(baseFilm => {
     const dynamicSchedule: ScheduleEntry[] = [];
     if (allAvailableHallNames.length > 0) {
       DAYS_FOR_GENERATION.forEach(day => {
-        // Assign 1 to 3 showtimes per day for this film, spread across available halls
         const numShowtimesToday = Math.floor(Math.random() * Math.min(3, allAvailableHallNames.length)) + 1;
         
-        // Shuffle halls to pick from for variety
         const shuffledHalls = [...allAvailableHallNames].sort(() => 0.5 - Math.random());
 
         for (let i = 0; i < numShowtimesToday; i++) {
-          if (i >= shuffledHalls.length) break; // Not enough halls for desired showtimes
+          if (i >= shuffledHalls.length) break; 
           
           const hallName = shuffledHalls[i];
           const randomTimeIndex = Math.floor(Math.random() * POSSIBLE_TIMES_FOR_GENERATION.length);
           const time = POSSIBLE_TIMES_FOR_GENERATION[randomTimeIndex];
           
-          // Avoid duplicate day/time/hall entries for the same film if logic somehow creates them
           if (!dynamicSchedule.some(e => e.day === day && e.time === time && e.hallName === hallName)) {
             dynamicSchedule.push({ day, time, hallName });
           }
         }
       });
     }
-    // Sort schedule for consistency
     dynamicSchedule.sort((a, b) => {
       if (a.day !== b.day) return DAYS_FOR_GENERATION.indexOf(a.day) - DAYS_FOR_GENERATION.indexOf(b.day);
       return POSSIBLE_TIMES_FOR_GENERATION.indexOf(a.time) - POSSIBLE_TIMES_FOR_GENERATION.indexOf(b.time);
