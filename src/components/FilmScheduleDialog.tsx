@@ -58,7 +58,7 @@ export const FilmScheduleDialog: React.FC<FilmScheduleDialogProps> = ({ film, ch
                         asChild
                         onClick={() => setDialogOpen(false)} // Close dialog on click
                       >
-                        <Link href={`/film/${film.id}?hall=${encodeURIComponent(entry.hallName)}`} >
+                        <Link href={`/film/${film.id}?hall=${encodeURIComponent(entry.hallName)}&day=${encodeURIComponent(entry.day)}&time=${encodeURIComponent(entry.time)}`} >
                           <div className="flex items-center text-sm w-full">
                             <Clock className="w-4 h-4 mr-2 text-muted-foreground" />
                             <span className="font-medium text-foreground">{entry.time}</span>

@@ -3,12 +3,12 @@
 import React, { useMemo } from 'react';
 import { useLayoutContext } from '@/contexts/LayoutContext';
 import { GridCell } from './GridCell';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Button } from '@/components/ui/button';
-import type { PreviewMode, SeatStatus } from '@/types/layout';
+import type { PreviewMode, SeatStatus, CellData } from '@/types/layout';
 import { Ticket } from 'lucide-react';
 import { calculatePreviewStates } from '@/lib/layout-utils';
 
@@ -26,7 +26,6 @@ export const LayoutPreview: React.FC = () => {
   const displayedGrid = useMemo(() => {
     if (!layout) return [];
     if (previewMode === 'normal') {
-      // Ensure seats have 'available' status if not set
       return layout.grid.map(row => row.map(cell => {
         if (cell.type === 'seat' && !cell.status) {
           return { ...cell, status: 'available' as SeatStatus };
@@ -34,10 +33,31 @@ export const LayoutPreview: React.FC = () => {
         return cell;
       }));
     }
-    // For other modes, calculatePreviewStates will handle default statuses.
     const previewLayout = calculatePreviewStates(layout);
     return previewLayout.grid;
   }, [layout, previewMode]);
+
+  const selectedSeatDisplayNames = useMemo(() => {
+    if (!layout || selectedSeatsForPurchase.length === 0) return "None";
+    
+    const seatIdToDisplayNameMap = new Map<string, string>();
+    layout.grid.forEach((rowArr, rowIndex) => {
+      let seatInRowCount = 0;
+      const rowLetter = String.fromCharCode('A'.charCodeAt(0) + rowIndex);
+      rowArr.forEach((cell) => {
+        if (cell.type === 'seat') {
+          seatInRowCount++;
+          seatIdToDisplayNameMap.set(cell.id, `${rowLetter}${seatInRowCount}`);
+        }
+      });
+    });
+
+    return selectedSeatsForPurchase
+      .map(seat => seatIdToDisplayNameMap.get(seat.id))
+      .filter(Boolean)
+      .sort()
+      .join(', ');
+  }, [layout, selectedSeatsForPurchase]);
 
   if (!layout) return <p>Loading preview...</p>;
 
@@ -78,11 +98,11 @@ export const LayoutPreview: React.FC = () => {
     }
   }
 
-
   return (
     <Card className="h-full flex flex-col m-2 shadow-lg">
       <CardHeader>
         <CardTitle>{layout.name}</CardTitle>
+        <CardDescription>Select available seats below.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col flex-1 p-4 pt-0 overflow-hidden">
         <div className="mb-3">
@@ -121,7 +141,7 @@ export const LayoutPreview: React.FC = () => {
 
               return rowArr.map((cell, colIndex) => {
                 if (mergedScreenCellsToSkip.has(cell.id) && cell.type === 'screen') {
-                  return null; // Skip rendering this cell as it's part of a merged screen
+                  return null; 
                 }
 
                 let currentSeatNumberDisplay: string | undefined = undefined;
@@ -155,9 +175,9 @@ export const LayoutPreview: React.FC = () => {
       </CardContent>
       
       <CardFooter className="p-3 border-t flex-col items-start gap-2">
-        <div className="flex justify-between w-full items-center">
+        <div className="flex justify-between w-full items-center mb-1">
             <p className="text-sm font-medium">
-                Selected Seats: <span className="text-primary font-semibold">{selectedSeatsForPurchase.length}</span>
+                Selected Seats: <span className="text-primary font-semibold">{selectedSeatDisplayNames}</span>
             </p>
             {selectedSeatsForPurchase.length > 0 && typeof clearSeatSelection === 'function' && (
                  <Button variant="outline" size="sm" onClick={clearSeatSelection} className="text-xs">
