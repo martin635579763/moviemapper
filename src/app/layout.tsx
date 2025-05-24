@@ -5,7 +5,7 @@ import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-// import { AuthProvider } from '@/contexts/AuthContext'; // Removed
+import { LayoutProvider } from '@/contexts/LayoutContext'; // Uncommented
 
 // GeistSans and GeistMono are imported as objects.
 // Their .variable property provides the CSS variable class name.
@@ -39,10 +39,10 @@ export default function RootLayout({
           in `tailwind.config.ts` to use `var(--font-geist-sans)`.
           For now, `globals.css` handles this directly.
         */}
-        {/* <AuthProvider> Removed Wrapper */}
+        <LayoutProvider> {/* Enabled LayoutProvider */}
           {children}
           <Toaster />
-        {/* </AuthProvider> Removed Wrapper */}
+        </LayoutProvider> {/* Enabled LayoutProvider */}
       </body>
     </html>
   );
