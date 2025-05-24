@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { HallLayout, CellData, EditorTool, SeatCategory, PreviewMode, LayoutContextType, SeatStatus } from '@/types/layout';
-import { createDefaultLayout, calculatePreviewStates, DEFAULT_ROWS, DEFAULT_COLS } from '@/lib/layout-utils';
+import { createDefaultLayout, DEFAULT_ROWS, DEFAULT_COLS } from '@/lib/layout-utils';
 import { useToast } from "@/hooks/use-toast";
 
 const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
@@ -19,15 +19,25 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
   const [selectedSeatsForPurchase, setSelectedSeatsForPurchase] = useState<CellData[]>([]);
   const { toast } = useToast();
 
+  // Reactive list of stored layout names
+  const [ctxStoredLayoutNames, setCtxStoredLayoutNames] = useState<string[]>([]);
+
+  const refreshStoredLayoutNames = useCallback(() => {
+    if (typeof window === 'undefined') {
+      setCtxStoredLayoutNames([]);
+      return;
+    }
+    const indexJson = localStorage.getItem(LOCAL_STORAGE_INDEX_KEY);
+    const names = indexJson ? JSON.parse(indexJson) : [];
+    setCtxStoredLayoutNames(names);
+  }, []);
+
+  useEffect(() => {
+    refreshStoredLayoutNames(); // Initial load of stored names
+  }, [refreshStoredLayoutNames]);
+
   const initializeLayout = useCallback((rows: number, cols: number, name?: string) => {
     const newLayout = createDefaultLayout(rows, cols, name);
-    // Ensure all seats in a new layout are 'available'
-    newLayout.grid = newLayout.grid.map(row => row.map(cell => {
-      if (cell.type === 'seat' && !cell.status) {
-        return { ...cell, status: 'available' as SeatStatus };
-      }
-      return cell;
-    }));
     setLayout(newLayout);
     setSelectedSeatsForPurchase([]);
   }, []);
@@ -42,12 +52,11 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       const cell = newGrid[row][col];
       let newScreenCellIds = [...prevLayout.screenCellIds];
 
-      // Handle deselection if cell type changes from seat
       if (cell.type === 'seat' && selectedTool !== 'seat' && selectedTool !== 'select') {
-        delete cell.status; // Remove status
+        delete cell.status; 
         setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id));
       }
-       if (cell.type === 'screen' && selectedTool !== 'screen') {
+      if (cell.type === 'screen' && selectedTool !== 'screen') {
         newScreenCellIds = newScreenCellIds.filter(id => id !== cell.id);
       }
       
@@ -55,7 +64,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
         case 'seat':
           cell.type = 'seat';
           cell.category = selectedSeatCategory;
-          cell.status = cell.status || 'available'; // Set to available if not already set (e.g. if it was empty)
+          cell.status = cell.status || 'available';
           break;
         case 'aisle':
         case 'screen':
@@ -80,7 +89,6 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
              if (cell.category !== selectedSeatCategory) {
                 cell.category = selectedSeatCategory;
              }
-             // Toggle selection via select tool is not part of this logic, handled by toggleSeatSelection
           }
           break;
       }
@@ -108,8 +116,9 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       }
       const processedLayout = {
         ...newLayoutData,
+        name: newLayoutData.name || 'Untitled Hall', // Ensure name exists
         grid: newLayoutData.grid.map(row => row.map(cell => {
-          if (cell.type === 'seat' && !cell.status) { // Ensure seats have a status
+          if (cell.type === 'seat' && !cell.status) { 
             return { ...cell, status: 'available' as SeatStatus };
           }
           return cell;
@@ -147,6 +156,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Success", description: `Layout "${layoutToExport.name}" exported.` });
   };
 
+  // This is now a direct localStorage reader, not for reactive UI updates primarily
   const getStoredLayoutNames = useCallback((): string[] => {
     if (typeof window === 'undefined') return [];
     const indexJson = localStorage.getItem(LOCAL_STORAGE_INDEX_KEY);
@@ -159,15 +169,14 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "Error", description: "Layout name cannot be empty." });
       return false;
     }
-    const names = getStoredLayoutNames();
-    if (names.includes(saveName) && !confirm(`Layout "${saveName}" already exists. Overwrite?`)) {
+    const currentStoredNames = getStoredLayoutNames(); // Use direct getter for check
+    if (currentStoredNames.includes(saveName) && !confirm(`Layout "${saveName}" already exists. Overwrite?`)) {
       return false;
     }
     
     const layoutToSave = { ...layout, name: saveName };
     layoutToSave.grid = layoutToSave.grid.map(row => row.map(cell => {
         const { isOccluded, hasGoodView, ...restOfCell } = cell;
-        // When saving, convert 'selected' to 'available' to avoid saving temporary state
         if (restOfCell.type === 'seat' && restOfCell.status === 'selected') {
           return { ...restOfCell, status: 'available' as SeatStatus };
         }
@@ -176,13 +185,14 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
 
     localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + saveName, JSON.stringify(layoutToSave));
     
-    if (!names.includes(saveName)) {
-      localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify([...names, saveName]));
+    if (!currentStoredNames.includes(saveName)) {
+      localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify([...currentStoredNames, saveName]));
     }
-    setLayout(prev => ({...prev, name: saveName})); // Update current layout name in context
+    setLayout(prev => ({...prev, name: saveName}));
+    refreshStoredLayoutNames(); // Update reactive list in context
     toast({ title: "Success", description: `Layout "${saveName}" saved to browser.` });
     return true;
-  }, [layout, getStoredLayoutNames, toast]);
+  }, [layout, toast, refreshStoredLayoutNames, getStoredLayoutNames]);
 
   const loadLayoutFromStorage = useCallback((layoutName: string) => {
     if (typeof window === 'undefined') return;
@@ -202,10 +212,11 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
   const deleteStoredLayout = useCallback((layoutName: string) => {
     if (typeof window === 'undefined') return;
     localStorage.removeItem(LOCAL_STORAGE_LAYOUT_PREFIX + layoutName);
-    const names = getStoredLayoutNames();
-    localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(names.filter(name => name !== layoutName)));
+    const currentStoredNames = getStoredLayoutNames(); // Use direct getter
+    localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(currentStoredNames.filter(name => name !== layoutName)));
+    refreshStoredLayoutNames(); // Update reactive list in context
     toast({ title: "Success", description: `Layout "${layoutName}" deleted from browser.` });
-  }, [getStoredLayoutNames, toast]);
+  }, [toast, refreshStoredLayoutNames, getStoredLayoutNames]);
 
   const toggleSeatSelection = useCallback((rowIndex: number, colIndex: number) => {
     setLayout(prevLayout => {
@@ -249,6 +260,8 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       initializeLayout, updateCell,
       loadLayout, exportLayout,
       saveLayoutToStorage, loadLayoutFromStorage, deleteStoredLayout, getStoredLayoutNames,
+      storedLayoutNames: ctxStoredLayoutNames, // Provide reactive list
+      refreshStoredLayoutNames, // Provide refresher function
       selectedSeatsForPurchase, toggleSeatSelection, confirmTicketPurchase, clearSeatSelection
     }}>
       {children}

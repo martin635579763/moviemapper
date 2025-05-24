@@ -22,7 +22,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  // AlertDialogTrigger, // Removed direct import as it's conditionally used or causing issues
 } from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"; 
 
@@ -50,15 +49,17 @@ export const AppToolbar: React.FC = () => {
     selectedSeatCategory, setSelectedSeatCategory,
     initializeLayout,
     loadLayout, exportLayout,
-    saveLayoutToStorage, loadLayoutFromStorage, getStoredLayoutNames, deleteStoredLayout,
-    // clearSeatSelection // Removed as it's no longer in context
+    saveLayoutToStorage, loadLayoutFromStorage, 
+    deleteStoredLayout,
+    storedLayoutNames, // Consume reactive list from context
+    refreshStoredLayoutNames, // Consume refresher from context
+    clearSeatSelection 
   } = useLayoutContext();
 
   const [rows, setRows] = useState(layout.rows || DEFAULT_ROWS);
   const [cols, setCols] = useState(layout.cols || DEFAULT_COLS);
   const [layoutName, setLayoutName] = useState(layout.name || "New Hall");
   const [saveLayoutNameInput, setSaveLayoutNameInput] = useState("");
-  const [storedLayoutNames, setStoredLayoutNames] = useState<string[]>([]);
   const [layoutToDelete, setLayoutToDelete] = useState<string | null>(null);
 
 
@@ -68,20 +69,14 @@ export const AppToolbar: React.FC = () => {
     setLayoutName(layout.name);
     setRows(layout.rows);
     setCols(layout.cols);
-    setSaveLayoutNameInput(layout.name); // Pre-fill save input with current layout name
+    setSaveLayoutNameInput(layout.name); 
   }, [layout.name, layout.rows, layout.cols]);
 
-  const refreshStoredNames = useCallback(() => {
-    setStoredLayoutNames(getStoredLayoutNames());
-  }, [getStoredLayoutNames]);
-
-  useEffect(() => {
-    refreshStoredNames();
-  }, [refreshStoredNames]);
+  // Removed local storedLayoutNames state and its refresh logic, now using context's
 
   const handleInitialize = () => {
     initializeLayout(rows, cols, layoutName);
-    // clearSeatSelection(); // Removed call
+    if (typeof clearSeatSelection === 'function') clearSeatSelection();
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,8 +92,8 @@ export const AppToolbar: React.FC = () => {
       reader.onload = (e) => {
         try {
           const loadedLayoutData = JSON.parse(e.target?.result as string);
-          loadLayout(loadedLayoutData); // loadLayout now handles updating context's layout name
-          // clearSeatSelection(); // Removed call
+          loadLayout(loadedLayoutData); 
+          if (typeof clearSeatSelection === 'function') clearSeatSelection();
         } catch (error) {
           console.error("Failed to parse layout file:", error);
         }
@@ -109,14 +104,14 @@ export const AppToolbar: React.FC = () => {
 
   const handleSaveToStorage = () => {
     if (saveLayoutToStorage(saveLayoutNameInput)) {
-      refreshStoredNames();
+      // refreshStoredLayoutNames(); // Context handles refreshing its internal list
     }
   };
 
   const handleDeleteStoredLayout = () => {
     if (layoutToDelete) {
       deleteStoredLayout(layoutToDelete);
-      refreshStoredNames();
+      // refreshStoredLayoutNames(); // Context handles refreshing
       setLayoutToDelete(null);
     }
   };
@@ -215,7 +210,7 @@ export const AppToolbar: React.FC = () => {
              <Select onValueChange={(value) => {
                 if (value === "__manage__") return;
                 loadLayoutFromStorage(value);
-                // clearSeatSelection(); // Removed call
+                if (typeof clearSeatSelection === 'function') clearSeatSelection();
               }}>
               <SelectTrigger className="w-[160px] h-9 text-xs">
                 <SelectValue placeholder="Load from Browser" />
@@ -229,7 +224,7 @@ export const AppToolbar: React.FC = () => {
         )}
          <Tooltip>
           <TooltipTrigger asChild>
-             <Button variant="outline" size="icon" className="h-9 w-9" onClick={refreshStoredNames}><ListRestart className="h-4 w-4"/></Button>
+             <Button variant="outline" size="icon" className="h-9 w-9" onClick={refreshStoredLayoutNames}><ListRestart className="h-4 w-4"/></Button>
           </TooltipTrigger>
           <TooltipContent><p>Refresh saved layouts list</p></TooltipContent>
         </Tooltip>
@@ -239,8 +234,8 @@ export const AppToolbar: React.FC = () => {
          <Select onValueChange={(value) => {
             const selectedSample = sampleLayouts.find(sl => sl.name === value);
             if (selectedSample) {
-              loadLayout(JSON.parse(JSON.stringify(selectedSample))); // Deep copy
-              // clearSeatSelection(); // Removed call
+              loadLayout(JSON.parse(JSON.stringify(selectedSample))); 
+              if (typeof clearSeatSelection === 'function') clearSeatSelection();
             }
           }}>
           <SelectTrigger className="w-[150px] h-9 text-xs">
@@ -282,7 +277,6 @@ export const AppToolbar: React.FC = () => {
         </Popover>
       </div>
       
-      {/* Delete Confirmation Dialog Trigger and Content Area */}
       {storedLayoutNames.length > 0 && (
         <Popover>
           <PopoverTrigger asChild>
@@ -297,10 +291,6 @@ export const AppToolbar: React.FC = () => {
                     {storedLayoutNames.map((name) => (
                       <CommandItem key={name} onSelect={() => setLayoutToDelete(name)} className="flex justify-between items-center">
                         <span>{name}</span>
-                        {/* 
-                          The AlertDialogTrigger was removed here. The Button's onClick now directly
-                          sets the state to open the AlertDialog. The AlertDialog itself is controlled.
-                        */}
                         <Button variant="ghost" size="sm" onClick={() => setLayoutToDelete(name)}>Delete</Button>
                       </CommandItem>
                     ))}
@@ -328,8 +318,7 @@ export const AppToolbar: React.FC = () => {
   );
 };
 
-// ShadCN Command components (simplified for this example, typically in their own files)
-// For a real app, these would be imported from '@/components/ui/command'
+// ShadCN Command components
 const Command: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, ...props }) => (
   <div className={cn("flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground", className)} {...props} />
 );
@@ -355,8 +344,7 @@ const CommandGroup: React.FC<React.HTMLAttributes<HTMLDivElement> & { heading?: 
 const CommandItem: React.FC<React.HTMLAttributes<HTMLDivElement> & { onSelect?: () => void }> = ({ className, onSelect, ...props }) => (
   <div
     className={cn("relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)}
-    onClick={onSelect} // Basic click handler for selection
+    onClick={onSelect} 
     {...props}
   />
 );
-

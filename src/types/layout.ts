@@ -39,7 +39,11 @@ export interface LayoutContextType {
   saveLayoutToStorage: (saveName: string) => boolean;
   loadLayoutFromStorage: (layoutName: string) => void;
   deleteStoredLayout: (layoutName: string) => void;
-  getStoredLayoutNames: () => string[];
+  getStoredLayoutNames: () => string[]; // Direct localStorage reader
+  
+  // Reactive list of stored layout names and its refresher
+  storedLayoutNames: string[]; 
+  refreshStoredLayoutNames: () => void;
 
   // Ticket purchasing related functions and state
   selectedSeatsForPurchase: CellData[];
@@ -47,3 +51,4 @@ export interface LayoutContextType {
   confirmTicketPurchase: () => void;
   clearSeatSelection: () => void;
 }
+
