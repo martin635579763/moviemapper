@@ -7,23 +7,24 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { UserCog, Clapperboard } from 'lucide-react'; 
 
-interface CategorizedFilms {
-  categoryTitle: string;
-  films: Film[];
-}
+// CategorizedFilms interface is no longer needed
+// interface CategorizedFilms {
+//   categoryTitle: string;
+//   films: Film[];
+// }
 
 export default function HomePage() {
-  // Updated categories to ensure all 4 sample films are shown
-  const categoriesToShow: string[] = ['Sci-Fi', 'Mystery', 'Action', 'Drama']; 
+  // Categories logic is removed, we'll display all films directly
+  // const categoriesToShow: string[] = ['Sci-Fi', 'Mystery', 'Action', 'Drama']; 
 
-  const categorizedFilms: CategorizedFilms[] = categoriesToShow.map(category => {
-    return {
-      categoryTitle: `${category} Movies`, // Example: "Sci-Fi Movies"
-      films: sampleFilms.filter(film => 
-        film.genre.toLowerCase().includes(category.toLowerCase())
-      )
-    };
-  }).filter(group => group.films.length > 0); // Only keep categories with films
+  // const categorizedFilms: CategorizedFilms[] = categoriesToShow.map(category => {
+  //   return {
+  //     categoryTitle: `${category} Movies`,
+  //     films: sampleFilms.filter(film => 
+  //       film.genre.toLowerCase().includes(category.toLowerCase())
+  //     )
+  //   };
+  // }).filter(group => group.films.length > 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 text-foreground p-4 sm:p-6 md:p-8">
@@ -41,28 +42,24 @@ export default function HomePage() {
         </Button>
       </header>
 
-      {categorizedFilms.length === 0 && (
+      {sampleFilms.length === 0 && (
         <div className="text-center py-20">
-          <p className="text-xl text-muted-foreground">No films available in the selected categories right now. Check back soon!</p>
+          <p className="text-xl text-muted-foreground">No films available right now. Check back soon!</p>
         </div>
       )}
 
-      {categorizedFilms.map(({ categoryTitle, films }) => (
-        <section key={categoryTitle} className="mb-12">
+      {sampleFilms.length > 0 && (
+        <section className="mb-12">
           <h2 className="text-2xl sm:text-3xl font-semibold text-primary mb-6 pb-2 border-b-2 border-primary/30">
-            {categoryTitle}
+            Featured Films
           </h2>
-          {films.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-8">
-              {films.map(film => (
-                <FilmCard key={film.id} film={film} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground">No films found in this category.</p>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-8">
+            {sampleFilms.map(film => (
+              <FilmCard key={film.id} film={film} />
+            ))}
+          </div>
         </section>
-      ))}
+      )}
       
       <footer className="text-center mt-16 py-8 text-muted-foreground text-sm border-t border-border/50">
         Powered by Firebase Studio & Your Imagination!
