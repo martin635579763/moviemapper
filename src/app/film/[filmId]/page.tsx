@@ -12,7 +12,7 @@ import type { HallLayout } from '@/types/layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, Clock, Ticket as TicketIconLucide } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Clock, Ticket as TicketIconLucide, Image as ImageIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 
@@ -48,13 +48,12 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
     } else {
       loadLayoutFromStorage(selectedLayoutName);
     }
-    // clearSeatSelection(); // Removed as it no longer exists in context
   };
 
   return (
     <div className="flex flex-col xl:flex-row gap-6 p-4 md:p-6 max-w-screen-2xl mx-auto">
       {/* Film Details Section */}
-      <Card className="xl:w-1/3 shadow-xl rounded-lg overflow-hidden">
+      <Card className="xl:w-1/3 shadow-xl rounded-lg overflow-hidden flex flex-col">
         <CardHeader className="p-0">
           <div className="relative w-full aspect-[2/3]">
             <Image
@@ -68,7 +67,7 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
             />
           </div>
         </CardHeader>
-        <CardContent className="p-6">
+        <CardContent className="p-6 flex-grow">
           <CardTitle className="text-2xl md:text-3xl font-bold mb-3">{film.title}</CardTitle>
           <div className="space-y-2 text-sm text-muted-foreground mb-4">
             <div className="flex items-center">
@@ -80,7 +79,32 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
               <span>{film.duration}</span>
             </div>
           </div>
-          <p className="text-foreground text-base leading-relaxed">{film.description}</p>
+          <p className="text-foreground text-base leading-relaxed mb-6">{film.description}</p>
+          
+          {/* Detail Images Gallery */}
+          {film.detailImageUrls && film.detailImageUrls.length > 0 && (
+            <div className="mt-auto pt-6 border-t">
+              <h3 className="text-lg font-semibold text-primary mb-3 flex items-center">
+                <ImageIcon className="mr-2 h-5 w-5" />
+                More Images
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                {film.detailImageUrls.map((url, index) => (
+                  <div key={index} className="relative aspect-video rounded-md overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                    <Image
+                      src={url}
+                      alt={`Detail image ${index + 1} for ${film.title}`}
+                      fill
+                      sizes="(max-width: 768px) 50vw, (max-width: 1280px) 25vw, 15vw"
+                      className="object-cover"
+                      data-ai-hint={`${generateDataAiHint(film.genre)} scene`}
+                      loading="lazy"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
