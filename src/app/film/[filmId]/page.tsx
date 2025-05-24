@@ -13,8 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft, CalendarDays, Clock, Ticket as TicketIconLucide, Info } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
+// Select components are no longer needed here as the dropdown is removed
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+// import { Label } from '@/components/ui/label';
 
 interface FilmTicketBookingInterfaceProps {
   film: Film;
@@ -25,13 +26,14 @@ interface FilmTicketBookingInterfaceProps {
 }
 
 const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({ film, initialLayout, initialHallNameOverride, selectedDay, selectedTime }) => {
-  const { layout, loadLayout, loadLayoutFromStorage, clearSeatSelection, storedLayoutNames } = useLayoutContext();
+  const { layout, loadLayout, loadLayoutFromStorage, clearSeatSelection } = useLayoutContext();
   
-  const allAvailableLayoutNamesForDropdown = useMemo(() => {
-      const sampleNames = sampleLayouts.map(l => l.name);
-      const combinedNames = Array.from(new Set([...sampleNames, ...(storedLayoutNames || [])]));
-      return combinedNames.sort();
-  }, [storedLayoutNames]);
+  // Dropdown logic removed
+  // const allAvailableLayoutNamesForDropdown = useMemo(() => {
+  //     const sampleNames = sampleLayouts.map(l => l.name);
+  //     const combinedNames = Array.from(new Set([...sampleNames, ...(storedLayoutNames || [])]));
+  //     return combinedNames.sort();
+  // }, [storedLayoutNames]);
 
   useEffect(() => {
     if (initialHallNameOverride) {
@@ -48,37 +50,38 @@ const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({
   }, [initialLayout, initialHallNameOverride, loadLayout, loadLayoutFromStorage, clearSeatSelection]);
 
 
-  const handleHallSelectionChange = (selectedLayoutName: string) => {
-    if (!selectedLayoutName || (layout && selectedLayoutName === layout.name)) return;
+  // handleHallSelectionChange function removed
+  // const handleHallSelectionChange = (selectedLayoutName: string) => {
+  //   if (!selectedLayoutName || (layout && selectedLayoutName === layout.name)) return;
 
-    const sampleLayoutToLoad = sampleLayouts.find(sl => sl.name === selectedLayoutName);
-    if (sampleLayoutToLoad) {
-      loadLayout(JSON.parse(JSON.stringify(sampleLayoutToLoad))); 
-    } else {
-      loadLayoutFromStorage(selectedLayoutName);
-    }
-     if (typeof clearSeatSelection === 'function') clearSeatSelection();
-  };
+  //   const sampleLayoutToLoad = sampleLayouts.find(sl => sl.name === selectedLayoutName);
+  //   if (sampleLayoutToLoad) {
+  //     loadLayout(JSON.parse(JSON.stringify(sampleLayoutToLoad))); 
+  //   } else {
+  //     loadLayoutFromStorage(selectedLayoutName);
+  //   }
+  //    if (typeof clearSeatSelection === 'function') clearSeatSelection();
+  // };
 
   return (
     <div className="flex flex-col xl:flex-row gap-6 p-4 md:p-6 max-w-screen-2xl mx-auto">
       {/* Film Details Section - Smaller Poster */}
-      <Card className="xl:w-[380px] shrink-0 shadow-xl rounded-lg overflow-hidden flex flex-col self-start">
+      <Card className="xl:w-[320px] shrink-0 shadow-xl rounded-lg overflow-hidden flex flex-col self-start"> {/* Adjusted width */}
         <CardHeader className="p-0">
           <div className="relative w-full aspect-[2/3]">
             <Image
               src={film.posterUrl}
               alt={`Poster for ${film.title}`}
               fill
-              sizes="(max-width: 420px) 100vw, 380px" 
+              sizes="(max-width: 360px) 100vw, 320px"  // Adjusted sizes
               className="object-cover"
               data-ai-hint="movie poster"
               priority
             />
           </div>
         </CardHeader>
-        <CardContent className="p-6 flex-grow">
-          <CardTitle className="text-xl md:text-2xl font-bold mb-2">{film.title}</CardTitle>
+        <CardContent className="p-5 flex-grow"> {/* Adjusted padding */}
+          <CardTitle className="text-xl md:text-2xl font-bold mb-2 line-clamp-2">{film.title}</CardTitle>
           <div className="space-y-1 text-xs text-muted-foreground mb-3">
             <div className="flex items-center">
               <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
@@ -89,7 +92,7 @@ const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({
               <span>{film.duration}</span>
             </div>
           </div>
-          <p className="text-foreground text-sm leading-relaxed">{film.description}</p>
+          <p className="text-foreground text-sm leading-relaxed line-clamp-5">{film.description}</p> {/* Added line-clamp */}
         </CardContent>
       </Card>
 
@@ -111,28 +114,8 @@ const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({
         
         <div className="mb-4">
             <h2 className="text-2xl font-semibold text-primary mb-1">Select Your Seats</h2>
-             {allAvailableLayoutNamesForDropdown.length > 0 && (
-              <div className="mb-4 max-w-xs">
-                <Label htmlFor="hall-select" className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                  Change Hall Layout:
-                </Label>
-                <Select
-                  value={layout?.name || ""}
-                  onValueChange={handleHallSelectionChange}
-                >
-                  <SelectTrigger id="hall-select" className="w-full">
-                    <SelectValue placeholder="Select a hall layout" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allAvailableLayoutNamesForDropdown.map(name => (
-                      <SelectItem key={name} value={name}>
-                        {name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <p className="text-sm text-muted-foreground">The layout for <strong>{layout?.name || 'the selected hall'}</strong> is shown below.</p>
+             {/* Dropdown for changing hall layout removed */}
         </div>
         <div className="flex-grow mt-1 rounded-lg overflow-hidden shadow-md">
           <div className="h-full min-h-[400px] lg:min-h-[500px] flex flex-col">
@@ -181,7 +164,7 @@ function FilmPageContent() {
     
     return { 
       film: currentFilm, 
-      layoutToLoad: layoutToLoad, // Can be undefined if initialHallNameOverride is set for a stored layout
+      layoutToLoad: layoutToLoad, 
       initialHallNameOverride: initialHallNameOverrideForInterface 
     };
   }, [filmId, hallNameFromQuery]);
@@ -192,7 +175,7 @@ function FilmPageContent() {
     return <div className="text-center py-20 text-xl text-destructive-foreground">Film ID is missing.</div>;
   }
 
-  if (!film) { // We allow layoutToLoad to be undefined if an override is present
+  if (!film) { 
     return (
         <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-4">
             <TicketIconLucide className="w-16 h-16 text-primary mb-4 animate-pulse" />
@@ -207,13 +190,10 @@ function FilmPageContent() {
     );
   }
 
-  // Determine a fallback layout if both layoutToLoad (from samples/association) is undefined 
-  // AND initialHallNameOverride is not set. This ensures FilmTicketBookingInterface always gets an initialLayout.
   const finalInitialLayout = layoutToLoad || (initialHallNameOverride ? sampleLayouts[0] : sampleLayouts[0]);
 
 
   return (
-    // Ensure LayoutProvider re-mounts if hallNameFromQuery changes, ensuring FilmTicketBookingInterface re-initializes
     <LayoutProvider key={`${filmId}-${hallNameFromQuery || film.associatedLayoutName || 'defaultHall'}-${dayFromQuery}-${timeFromQuery}`}> 
        <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 text-foreground">
         <div className="p-4 md:p-6 sticky top-0 bg-background/80 backdrop-blur-md z-50 shadow-sm">
@@ -242,3 +222,4 @@ export default function FilmPage() {
     </Suspense>
   );
 }
+
