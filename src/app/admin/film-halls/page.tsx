@@ -5,18 +5,22 @@ import type { NextPage } from 'next';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useLayoutContext } from '@/contexts/LayoutContext';
-import { getSampleFilmsWithDynamicSchedules, type Film, type ScheduleEntry } from '@/data/films';
+import { getSampleFilmsWithDynamicSchedules, type Film, type ScheduleEntry, DAYS_FOR_GENERATION, POSSIBLE_TIMES_FOR_GENERATION } from '@/data/films';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input'; // Added
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { ShieldAlert, ListVideo, Save, CalendarDays, Clock, Building2 } from 'lucide-react'; // Changed Building to Building2
+import { ShieldAlert, ListVideo, Save, CalendarDays, Clock, Building2, Trash2, PlusCircle, RotateCcw } from 'lucide-react';
 
 const LOCAL_STORAGE_FILM_HALL_PREFERENCES_KEY = 'filmHallPreferences_v1';
+const USER_DEFINED_FILM_SCHEDULES_KEY = 'userDefinedFilmSchedules_v1';
+
 type FilmHallPreferences = Record<string, string[]>; // filmId: hallName[]
+type UserDefinedFilmSchedules = Record<string, ScheduleEntry[]>; // filmId: ScheduleEntry[]
 
 const FilmHallConfigPage: NextPage = () => {
   const { isManager } = useAuthContext();
@@ -24,13 +28,20 @@ const FilmHallConfigPage: NextPage = () => {
   const { toast } = useToast();
   const router = useRouter();
 
-  const [allFilmsData, setAllFilmsData] = useState<Film[]>([]); // Stores films with their dynamic schedules
+  const [allFilmsData, setAllFilmsData] = useState<Film[]>([]);
   const [selectedFilmId, setSelectedFilmId] = useState<string | null>(null);
-  const [currentFilmPreferences, setCurrentFilmPreferences] = useState<string[]>([]);
+  
+  // For Hall Preferences
+  const [currentFilmHallPreferences, setCurrentFilmHallPreferences] = useState<string[]>([]);
   const [allHallPreferences, setAllHallPreferences] = useState<FilmHallPreferences>({});
-  const [selectedFilmSchedule, setSelectedFilmSchedule] = useState<ScheduleEntry[] | undefined>(undefined);
 
-  const fetchAllFilmsWithSchedules = useCallback(() => {
+  // For Editable Schedule
+  const [editableSchedule, setEditableSchedule] = useState<ScheduleEntry[]>([]);
+  const [newShowtimeDay, setNewShowtimeDay] = useState<string>(DAYS_FOR_GENERATION[0]);
+  const [newShowtimeTime, setNewShowtimeTime] = useState<string>(POSSIBLE_TIMES_FOR_GENERATION[0]);
+  const [newShowtimeHall, setNewShowtimeHall] = useState<string>("");
+
+  const fetchAllFilmsDataWithSchedules = useCallback(() => {
     const filmsWithSchedules = getSampleFilmsWithDynamicSchedules();
     setAllFilmsData(filmsWithSchedules);
     return filmsWithSchedules;
@@ -44,36 +55,48 @@ const FilmHallConfigPage: NextPage = () => {
   
   useEffect(() => {
     refreshStoredLayoutNames();
-    fetchAllFilmsWithSchedules();
+    fetchAllFilmsDataWithSchedules();
 
     if (typeof window !== 'undefined') {
       try {
-        const prefsJson = localStorage.getItem(LOCAL_STORAGE_FILM_HALL_PREFERENCES_KEY);
-        setAllHallPreferences(prefsJson ? JSON.parse(prefsJson) : {});
+        const hallPrefsJson = localStorage.getItem(LOCAL_STORAGE_FILM_HALL_PREFERENCES_KEY);
+        setAllHallPreferences(hallPrefsJson ? JSON.parse(hallPrefsJson) : {});
       } catch (e) {
         console.error("Error reading film hall preferences from localStorage:", e);
         setAllHallPreferences({});
       }
     }
-  }, [isManager, refreshStoredLayoutNames, fetchAllFilmsWithSchedules]);
+    if (storedLayoutNames.length > 0) {
+      setNewShowtimeHall(storedLayoutNames[0]); // Default to first available hall
+    }
+  }, [isManager, refreshStoredLayoutNames, fetchAllFilmsDataWithSchedules, storedLayoutNames]);
 
   useEffect(() => {
     if (selectedFilmId) {
-      setCurrentFilmPreferences(allHallPreferences[selectedFilmId] || []);
+      setCurrentFilmHallPreferences(allHallPreferences[selectedFilmId] || []);
       const filmData = allFilmsData.find(f => f.id === selectedFilmId);
-      setSelectedFilmSchedule(filmData?.schedule);
+      setEditableSchedule(filmData?.schedule || []);
+      if (storedLayoutNames.length > 0 && !newShowtimeHall) {
+        setNewShowtimeHall(storedLayoutNames[0]);
+      }
     } else {
-      setCurrentFilmPreferences([]);
-      setSelectedFilmSchedule(undefined);
+      setCurrentFilmHallPreferences([]);
+      setEditableSchedule([]);
     }
-  }, [selectedFilmId, allHallPreferences, allFilmsData]);
+  }, [selectedFilmId, allHallPreferences, allFilmsData, storedLayoutNames, newShowtimeHall]);
 
   const handleFilmSelect = (filmId: string) => {
     setSelectedFilmId(filmId);
+    // Reset new showtime hall when film changes, if not already set by a stored layout
+    if (storedLayoutNames.length > 0) {
+      setNewShowtimeHall(storedLayoutNames[0]);
+    } else {
+      setNewShowtimeHall("");
+    }
   };
 
   const handleHallPreferenceChange = (hallName: string, checked: boolean) => {
-    setCurrentFilmPreferences(prev => {
+    setCurrentFilmHallPreferences(prev => {
       if (checked) {
         return [...prev, hallName];
       } else {
@@ -82,40 +105,110 @@ const FilmHallConfigPage: NextPage = () => {
     });
   };
 
-  const handleSaveChanges = () => {
+  const handleSaveHallPreferences = () => {
     if (!selectedFilmId) {
       toast({ title: "Error", description: "Please select a film first.", variant: "destructive" });
       return;
     }
-    const newAllPrefs = { ...allHallPreferences, [selectedFilmId]: currentFilmPreferences };
+    const newAllPrefs = { ...allHallPreferences, [selectedFilmId]: currentFilmHallPreferences };
     try {
       localStorage.setItem(LOCAL_STORAGE_FILM_HALL_PREFERENCES_KEY, JSON.stringify(newAllPrefs));
       setAllHallPreferences(newAllPrefs); 
       
-      // Re-fetch films to update schedule display based on new preferences
-      const updatedFilms = fetchAllFilmsWithSchedules();
-      const updatedSelectedFilm = updatedFilms.find(f => f.id === selectedFilmId);
-      setSelectedFilmSchedule(updatedSelectedFilm?.schedule);
-
-      toast({ title: "Preferences Saved", description: `Hall preferences for the selected film have been updated.` });
+      // Re-fetch films to update schedule display based on new preferences if no custom schedule exists
+      const currentSchedules: UserDefinedFilmSchedules = JSON.parse(localStorage.getItem(USER_DEFINED_FILM_SCHEDULES_KEY) || '{}');
+      if (!currentSchedules[selectedFilmId]) {
+        const updatedFilms = fetchAllFilmsDataWithSchedules();
+        const updatedSelectedFilm = updatedFilms.find(f => f.id === selectedFilmId);
+        setEditableSchedule(updatedSelectedFilm?.schedule || []);
+      }
+      toast({ title: "Preferences Saved", description: `Hall preferences for '${selectedFilm?.title}' updated.` });
     } catch (e) {
       console.error("Error saving film hall preferences to localStorage:", e);
-      toast({ title: "Error", description: "Could not save preferences.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not save hall preferences.", variant: "destructive" });
     }
   };
   
   const selectedFilm = useMemo(() => allFilmsData.find(f => f.id === selectedFilmId), [allFilmsData, selectedFilmId]);
 
-  const groupedSchedule = useMemo(() => {
-    if (!selectedFilmSchedule || selectedFilmSchedule.length === 0) return {};
-    return selectedFilmSchedule.reduce((acc, entry) => {
+  const groupedEditableSchedule = useMemo(() => {
+    if (!editableSchedule || editableSchedule.length === 0) return {};
+    return editableSchedule.reduce((acc, entry) => {
       if (!acc[entry.day]) {
         acc[entry.day] = [];
       }
       acc[entry.day].push(entry);
       return acc;
     }, {} as Record<string, ScheduleEntry[]>);
-  }, [selectedFilmSchedule]);
+  }, [editableSchedule]);
+
+  const handleAddShowtime = () => {
+    if (!selectedFilmId || !newShowtimeDay || !newShowtimeTime || !newShowtimeHall) {
+      toast({ title: "Error", description: "Please select day, time, and hall for the new showtime.", variant: "destructive" });
+      return;
+    }
+    const newEntry: ScheduleEntry = { day: newShowtimeDay, time: newShowtimeTime, hallName: newShowtimeHall };
+    // Check for duplicates
+    if (editableSchedule.some(e => e.day === newEntry.day && e.time === newEntry.time && e.hallName === newEntry.hallName)) {
+        toast({ title: "Duplicate", description: "This showtime already exists.", variant: "destructive" });
+        return;
+    }
+    setEditableSchedule(prev => [...prev, newEntry].sort((a, b) => {
+        if (a.day !== b.day) return DAYS_FOR_GENERATION.indexOf(a.day) - DAYS_FOR_GENERATION.indexOf(b.day);
+        const timeA = POSSIBLE_TIMES_FOR_GENERATION.indexOf(a.time);
+        const timeB = POSSIBLE_TIMES_FOR_GENERATION.indexOf(b.time);
+        if (timeA !== timeB) return timeA - timeB;
+        return a.hallName.localeCompare(b.hallName);
+      }));
+  };
+
+  const handleRemoveShowtime = (index: number) => {
+    setEditableSchedule(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveCustomSchedule = () => {
+    if (!selectedFilmId) {
+      toast({ title: "Error", description: "Please select a film first.", variant: "destructive" });
+      return;
+    }
+    try {
+      const currentSchedules: UserDefinedFilmSchedules = JSON.parse(localStorage.getItem(USER_DEFINED_FILM_SCHEDULES_KEY) || '{}');
+      currentSchedules[selectedFilmId] = editableSchedule;
+      localStorage.setItem(USER_DEFINED_FILM_SCHEDULES_KEY, JSON.stringify(currentSchedules));
+      
+      // Update allFilmsData to reflect this saved schedule immediately
+      setAllFilmsData(prevFilms => prevFilms.map(film => 
+        film.id === selectedFilmId ? { ...film, schedule: [...editableSchedule] } : film
+      ));
+      toast({ title: "Schedule Saved", description: `Custom schedule for '${selectedFilm?.title}' saved.` });
+    } catch (e) {
+      console.error("Error saving custom schedule to localStorage:", e);
+      toast({ title: "Error", description: "Could not save custom schedule.", variant: "destructive" });
+    }
+  };
+
+  const handleRestoreDefaultSchedule = () => {
+    if (!selectedFilmId) {
+      toast({ title: "Error", description: "Please select a film first.", variant: "destructive" });
+      return;
+    }
+    try {
+      const currentSchedules: UserDefinedFilmSchedules = JSON.parse(localStorage.getItem(USER_DEFINED_FILM_SCHEDULES_KEY) || '{}');
+      delete currentSchedules[selectedFilmId];
+      localStorage.setItem(USER_DEFINED_FILM_SCHEDULES_KEY, JSON.stringify(currentSchedules));
+      
+      // Re-fetch all films to get the default dynamically generated schedule
+      const updatedFilms = fetchAllFilmsDataWithSchedules();
+      const updatedSelectedFilm = updatedFilms.find(f => f.id === selectedFilmId);
+      setEditableSchedule(updatedSelectedFilm?.schedule || []); // Update editableSchedule to default
+      
+      toast({ title: "Schedule Restored", description: `Schedule for '${selectedFilm?.title}' restored to default.` });
+    } catch (e) {
+      console.error("Error restoring default schedule:", e);
+      toast({ title: "Error", description: "Could not restore default schedule.", variant: "destructive" });
+    }
+  };
+
 
   if (!isManager) {
     return (
@@ -133,11 +226,10 @@ const FilmHallConfigPage: NextPage = () => {
         <CardHeader>
           <CardTitle className="text-3xl font-bold text-primary flex items-center">
             <ListVideo className="mr-3 h-8 w-8" />
-            Configure Film Hall Preferences
+            Configure Film Schedules & Preferences
           </CardTitle>
           <CardDescription>
-            Select a film, choose preferred halls, and view the generated schedule.
-            If no halls are selected, all saved halls will be considered for that film.
+            Select a film, define preferred halls for dynamic scheduling, or set a custom fixed schedule.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -148,7 +240,7 @@ const FilmHallConfigPage: NextPage = () => {
                 <SelectValue placeholder="Choose a film..." />
               </SelectTrigger>
               <SelectContent>
-                {allFilmsData.map(film => ( // Use allFilmsData which includes schedules
+                {allFilmsData.map(film => (
                   <SelectItem key={film.id} value={film.id} className="text-base py-2">
                     {film.title}
                   </SelectItem>
@@ -159,13 +251,14 @@ const FilmHallConfigPage: NextPage = () => {
 
           {selectedFilm && (
             <>
+              {/* Hall Preferences Section */}
               <Card className="p-6 bg-muted/30 border-primary/20">
                 <CardHeader className="p-0 mb-4">
                   <CardTitle className="text-2xl text-primary">
-                    Available Halls for: <span className="font-bold">{selectedFilm.title}</span>
+                    Hall Preferences for Dynamic Schedule: <span className="font-bold">{selectedFilm.title}</span>
                   </CardTitle>
                   <CardDescription>
-                    Check the halls you want to be available for this film's schedule.
+                    Select halls to be considered if no custom schedule is set. If none selected, all saved halls are considered.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -177,7 +270,7 @@ const FilmHallConfigPage: NextPage = () => {
                         <div key={hallName} className="flex items-center space-x-2 p-3 bg-card rounded-md shadow-sm hover:shadow-md transition-shadow">
                           <Checkbox
                             id={`hall-${hallName}-${selectedFilm.id}`}
-                            checked={currentFilmPreferences.includes(hallName)}
+                            checked={currentFilmHallPreferences.includes(hallName)}
                             onCheckedChange={(checked) => handleHallPreferenceChange(hallName, !!checked)}
                           />
                           <Label htmlFor={`hall-${hallName}-${selectedFilm.id}`} className="text-sm font-medium cursor-pointer">
@@ -187,33 +280,125 @@ const FilmHallConfigPage: NextPage = () => {
                       ))}
                     </div>
                   )}
-                  <Button onClick={handleSaveChanges} className="mt-6 w-full sm:w-auto" size="lg">
+                  <Button onClick={handleSaveHallPreferences} className="mt-6 w-full sm:w-auto" size="lg">
                     <Save className="mr-2 h-5 w-5" />
-                    Save Preferences for {selectedFilm.title}
+                    Save Hall Preferences
                   </Button>
                 </CardContent>
               </Card>
 
+              {/* Custom Schedule Editor Section */}
+              <Card className="p-6 bg-muted/40 border-accent/30 mt-6">
+                <CardHeader className="p-0 mb-4">
+                    <CardTitle className="text-2xl text-accent-foreground flex justify-between items-center">
+                        <span>Custom Schedule Editor: <span className="font-bold">{selectedFilm.title}</span></span>
+                        <Button onClick={handleRestoreDefaultSchedule} variant="outline" size="sm">
+                            <RotateCcw className="mr-2 h-4 w-4"/> Restore Default Schedule
+                        </Button>
+                    </CardTitle>
+                    <CardDescription>
+                        Define a fixed schedule for this film. This will override dynamic generation based on hall preferences.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0 space-y-4">
+                    {/* Add new showtime form */}
+                    <div className="flex flex-col sm:flex-row gap-3 items-end p-4 border rounded-md bg-card">
+                        <div className="flex-1 min-w-[120px]">
+                            <Label htmlFor="new-day">Day</Label>
+                            <Select value={newShowtimeDay} onValueChange={setNewShowtimeDay}>
+                                <SelectTrigger id="new-day"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {DAYS_FOR_GENERATION.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                         <div className="flex-1 min-w-[120px]">
+                            <Label htmlFor="new-time">Time</Label>
+                            <Select value={newShowtimeTime} onValueChange={setNewShowtimeTime}>
+                                <SelectTrigger id="new-time"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {POSSIBLE_TIMES_FOR_GENERATION.map(time => <SelectItem key={time} value={time}>{time}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex-1 min-w-[150px]">
+                            <Label htmlFor="new-hall">Hall</Label>
+                            <Select value={newShowtimeHall} onValueChange={setNewShowtimeHall} disabled={storedLayoutNames.length === 0}>
+                                <SelectTrigger id="new-hall">
+                                    <SelectValue placeholder={storedLayoutNames.length === 0 ? "No halls saved" : "Select hall..."} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {storedLayoutNames.map(hall => <SelectItem key={hall} value={hall}>{hall}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <Button onClick={handleAddShowtime} disabled={!newShowtimeHall || storedLayoutNames.length === 0}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add Showtime
+                        </Button>
+                    </div>
+
+                    {/* Display and manage editable schedule */}
+                    <div className="mt-4">
+                        {Object.keys(groupedEditableSchedule).length > 0 ? (
+                            Object.entries(groupedEditableSchedule).map(([day, entries]) => (
+                                <div key={day} className="mb-3">
+                                    <h4 className="font-semibold mb-1.5 text-md flex items-center text-primary">
+                                        <CalendarDays className="w-4 h-4 mr-2" /> {day}
+                                    </h4>
+                                    <ul className="space-y-1.5 pl-1">
+                                        {entries.map((entry, idx) => {
+                                            // Find the original index in editableSchedule for removal
+                                            const originalIndex = editableSchedule.findIndex(
+                                                (e) => e.day === entry.day && e.time === entry.time && e.hallName === entry.hallName
+                                            );
+                                            return (
+                                                <li key={`${entry.day}-${entry.time}-${entry.hallName}-${idx}`} className="flex items-center justify-between text-xs p-2 bg-card/80 rounded-md shadow-sm">
+                                                    <div className="flex items-center">
+                                                        <Clock className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                                                        <span className="font-medium text-foreground mr-2">{entry.time}</span>
+                                                        <Building2 className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+                                                        <span className="text-foreground">{entry.hallName}</span>
+                                                    </div>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={() => handleRemoveShowtime(originalIndex)}>
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-muted-foreground text-sm">No custom schedule defined. Add showtimes or restore default.</p>
+                        )}
+                    </div>
+                     <Button onClick={handleSaveCustomSchedule} className="mt-4 w-full sm:w-auto" size="lg">
+                        <Save className="mr-2 h-5 w-5" /> Save Custom Schedule
+                    </Button>
+                </CardContent>
+              </Card>
+
+              {/* Current Effective Schedule Display */}
               <Card className="p-6 bg-muted/20 border-secondary/30 mt-6">
                 <CardHeader className="p-0 mb-4">
                   <CardTitle className="text-2xl text-secondary-foreground">
-                    Current Generated Schedule for: <span className="font-bold">{selectedFilm.title}</span>
+                    Current Effective Schedule for: <span className="font-bold">{selectedFilm.title}</span>
                   </CardTitle>
                   <CardDescription>
-                    This is how the schedule will appear based on your current hall preferences.
+                    This is how the schedule will appear (custom if saved, otherwise default dynamically generated).
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
-                  {Object.keys(groupedSchedule).length > 0 ? (
+                  {Object.keys(groupedEditableSchedule).length > 0 ? (
                     <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                      {Object.entries(groupedSchedule).map(([day, entries]) => (
+                      {Object.entries(groupedEditableSchedule).map(([day, entries]) => (
                         <div key={day}>
                           <h4 className="font-semibold mb-2 text-md flex items-center text-primary">
                             <CalendarDays className="w-4 h-4 mr-2" /> {day}
                           </h4>
                           <ul className="space-y-1.5 pl-1">
                             {entries.map((entry, idx) => (
-                              <li key={idx} className="flex items-center text-xs p-2 bg-card rounded-md shadow-sm">
+                              <li key={`${day}-${idx}-${entry.time}-${entry.hallName}`} className="flex items-center text-xs p-2 bg-card rounded-md shadow-sm">
                                 <Clock className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
                                 <span className="font-medium text-foreground mr-2">{entry.time}</span>
                                 <Building2 className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
@@ -225,7 +410,7 @@ const FilmHallConfigPage: NextPage = () => {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-muted-foreground">No schedule generated for this film with the current hall preferences and availability.</p>
+                    <p className="text-muted-foreground">No schedule currently available for this film. Please configure hall preferences or add a custom schedule.</p>
                   )}
                 </CardContent>
               </Card>
@@ -238,5 +423,3 @@ const FilmHallConfigPage: NextPage = () => {
 };
 
 export default FilmHallConfigPage;
-
-    

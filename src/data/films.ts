@@ -1,6 +1,6 @@
 
-import type { HallLayout } from '@/types/layout'; 
-import { sampleLayouts as staticSampleLayouts } from './sample-layouts'; // Though not directly used for schedule, good to keep if needed elsewhere
+import type { HallLayout } from '@/types/layout';
+// Removed unused import: import { sampleLayouts as staticSampleLayouts } from './sample-layouts';
 
 export interface ScheduleEntry {
   day: string;
@@ -14,7 +14,7 @@ export interface Film {
   description: string;
   posterUrl: string;
   detailImageUrls: string[];
-  associatedLayoutName: string; // Fallback if no specific schedule directs elsewhere or for initial load
+  associatedLayoutName: string;
   duration: string;
   genre: string;
   schedule?: ScheduleEntry[];
@@ -25,7 +25,6 @@ const getDetailImageUnsplashUrl = (keywords: string, width: number = 600, height
   return `https://source.unsplash.com/${width}x${height}/?${relevantKeywords},scene`;
 };
 
-// Base film data without schedules
 const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
   {
     id: '1',
@@ -33,9 +32,9 @@ const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
     description: 'An epic journey across galaxies to find a new home for humanity. Breathtaking visuals and a gripping storyline.',
     posterUrl: 'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
     detailImageUrls: [
-      getDetailImageUnsplashUrl('galaxy,stars', 600, 400),
-      getDetailImageUnsplashUrl('spaceship,cockpit', 600, 400),
-      getDetailImageUnsplashUrl('alien,planet', 600, 400),
+      getDetailImageUnsplashUrl('galaxy stars', 600, 400),
+      getDetailImageUnsplashUrl('spaceship cockpit', 600, 400),
+      getDetailImageUnsplashUrl('alien planet', 600, 400),
     ],
     associatedLayoutName: 'Standard Cinema',
     duration: "2h 30m",
@@ -47,8 +46,8 @@ const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
     description: 'A historian uncovers a hidden journal that leads to a forgotten city, revealing secrets that could rewrite history.',
     posterUrl: 'https://image.tmdb.org/t/p/w500/yhXy2l3xpiiNWCnOR9Y2T3MC22P.jpg',
     detailImageUrls: [
-      getDetailImageUnsplashUrl('ancient ruins,desert', 600, 400),
-      getDetailImageUnsplashUrl('old map,treasure', 600, 400),
+      getDetailImageUnsplashUrl('ancient ruins desert', 600, 400),
+      getDetailImageUnsplashUrl('old map treasure', 600, 400),
     ],
     associatedLayoutName: 'Small Hall',
     duration: "2h 00m",
@@ -60,9 +59,9 @@ const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
     description: 'Experience the ultimate luxury in our exclusive VIP screening. An unforgettable night of cinema.',
     posterUrl: 'https://image.tmdb.org/t/p/w500/uDO8zWDhfWwoFdKS4fzkUJt0Rf0.jpg',
     detailImageUrls: [
-      getDetailImageUnsplashUrl('red,carpet', 600, 400),
-      getDetailImageUnsplashUrl('luxury,theater', 600, 400),
-      getDetailImageUnsplashUrl('movie,premiere', 600, 400),
+      getDetailImageUnsplashUrl('red carpet', 600, 400),
+      getDetailImageUnsplashUrl('luxury theater', 600, 400),
+      getDetailImageUnsplashUrl('movie premiere', 600, 400),
     ],
     associatedLayoutName: 'Special VIP Hall',
     duration: "2h 10m",
@@ -74,9 +73,9 @@ const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
     description: 'Outnumbered and outgunned, a small group of heroes makes their final stand against an overwhelming force.',
     posterUrl: 'https://image.tmdb.org/t/p/w500/iZf0KyrE25z1sage4SYFLCCrMi9.jpg',
     detailImageUrls: [
-      getDetailImageUnsplashUrl('explosion,war', 600, 400),
-      getDetailImageUnsplashUrl('heroic,battle', 600, 400),
-      getDetailImageUnsplashUrl('soldiers,action', 600, 400),
+      getDetailImageUnsplashUrl('explosion war', 600, 400),
+      getDetailImageUnsplashUrl('heroic battle', 600, 400),
+      getDetailImageUnsplashUrl('soldiers action', 600, 400),
     ],
     associatedLayoutName: 'Standard Cinema',
     duration: "2h 05m",
@@ -84,16 +83,20 @@ const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
   }
 ];
 
-const POSSIBLE_TIMES_FOR_GENERATION = ["2:30 PM", "5:15 PM", "7:45 PM", "9:00 PM"];
-const DAYS_FOR_GENERATION = ["Today", "Tomorrow"];
+export const POSSIBLE_TIMES_FOR_GENERATION = ["2:00 PM", "2:30 PM", "4:30 PM", "5:15 PM", "7:00 PM", "7:45 PM", "9:00 PM", "9:30 PM"];
+export const DAYS_FOR_GENERATION = ["Today", "Tomorrow", "Next Day"];
+
 const LOCAL_STORAGE_LAYOUT_INDEX_KEY = 'seatLayout_index_v1';
 const LOCAL_STORAGE_FILM_HALL_PREFERENCES_KEY = 'filmHallPreferences_v1';
+const USER_DEFINED_FILM_SCHEDULES_KEY = 'userDefinedFilmSchedules_v1';
 
 type FilmHallPreferences = Record<string, string[]>; // filmId: hallName[]
+type UserDefinedFilmSchedules = Record<string, ScheduleEntry[]>; // filmId: ScheduleEntry[]
 
 export function getSampleFilmsWithDynamicSchedules(): Film[] {
   let storedLayoutNames: string[] = [];
   let filmHallPrefs: FilmHallPreferences = {};
+  let userDefinedSchedules: UserDefinedFilmSchedules = {};
 
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
@@ -105,53 +108,61 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
 
       const prefsJson = localStorage.getItem(LOCAL_STORAGE_FILM_HALL_PREFERENCES_KEY);
       filmHallPrefs = prefsJson ? JSON.parse(prefsJson) : {};
+      
+      const userSchedulesJson = localStorage.getItem(USER_DEFINED_FILM_SCHEDULES_KEY);
+      userDefinedSchedules = userSchedulesJson ? JSON.parse(userSchedulesJson) : {};
 
     } catch (e) {
       console.error("Error reading from localStorage in films.ts:", e);
     }
   }
 
-  // For schedule generation, we ONLY use explicitly saved layouts by the user.
   const globallyAvailableSavedHalls = new Set(storedLayoutNames);
 
   return BASE_FILM_DATA.map(baseFilm => {
+    // Check for a user-defined schedule first
+    const userSchedule = userDefinedSchedules[baseFilm.id];
+    if (userSchedule && Array.isArray(userSchedule)) {
+      // Filter user-defined schedule to only include halls that still exist
+      const validUserSchedule = userSchedule.filter(entry => globallyAvailableSavedHalls.has(entry.hallName));
+       validUserSchedule.sort((a, b) => {
+        if (a.day !== b.day) return DAYS_FOR_GENERATION.indexOf(a.day) - DAYS_FOR_GENERATION.indexOf(b.day);
+        const timeA = POSSIBLE_TIMES_FOR_GENERATION.indexOf(a.time);
+        const timeB = POSSIBLE_TIMES_FOR_GENERATION.indexOf(b.time);
+        if (timeA !== timeB) return timeA - timeB;
+        return a.hallName.localeCompare(b.hallName);
+      });
+      return {
+        ...baseFilm,
+        schedule: validUserSchedule,
+      };
+    }
+
+    // Fallback to dynamic generation if no user-defined schedule
     const dynamicSchedule: ScheduleEntry[] = [];
-    
     let hallsToUseForThisFilm: string[] = [];
     const filmSpecificPreferences = filmHallPrefs[baseFilm.id];
 
     if (filmSpecificPreferences && filmSpecificPreferences.length > 0) {
-      // Use preferred halls, but only if they currently exist as saved layouts
       hallsToUseForThisFilm = filmSpecificPreferences.filter(hallName => globallyAvailableSavedHalls.has(hallName));
     } else {
-      // If no preferences, or preferred halls don't exist, use all globally available saved halls for this film.
-      // Or, if the requirement is to ONLY use preferred halls and show no schedule if none are set/valid, then:
-      // hallsToUseForThisFilm = []; // This line would change if empty schedule is desired when no prefs.
-      // For now, let's default to all saved halls if no valid preferences for the film are found.
-      // This behavior can be adjusted based on exact requirements.
-      // To strictly use ONLY preferred halls:
-      // hallsToUseForThisFilm = filmSpecificPreferences ? filmSpecificPreferences.filter(hallName => globallyAvailableSavedHalls.has(hallName)) : [];
-      // Current behavior: if preferences specified, use them if valid. If no preferences, use ALL saved halls.
-       hallsToUseForThisFilm = filmSpecificPreferences && filmSpecificPreferences.length > 0 
-                                ? filmSpecificPreferences.filter(prefHall => globallyAvailableSavedHalls.has(prefHall))
-                                : [...globallyAvailableSavedHalls];
-
+      hallsToUseForThisFilm = [...globallyAvailableSavedHalls];
     }
-
 
     if (hallsToUseForThisFilm.length > 0) {
       DAYS_FOR_GENERATION.forEach(day => {
-        // Show each film in up to 2 (or fewer if fewer halls) different halls per day
         const shuffledHallsForDay = [...hallsToUseForThisFilm].sort(() => 0.5 - Math.random());
         const numHallsToShowPerDay = Math.min(shuffledHallsForDay.length, 2);
 
         for (let i = 0; i < numHallsToShowPerDay; i++) {
           const hallName = shuffledHallsForDay[i];
-          // Each hall gets 1 or 2 showtimes
-          const numShowtimesInHall = Math.floor(Math.random() * 2) + 1;
+          const numShowtimesInHall = Math.floor(Math.random() * 2) + 1; // 1 or 2 showtimes
           const timesForThisHall: string[] = [];
-          while(timesForThisHall.length < numShowtimesInHall && timesForThisHall.length < POSSIBLE_TIMES_FOR_GENERATION.length) {
-            const randomTime = POSSIBLE_TIMES_FOR_GENERATION[Math.floor(Math.random() * POSSIBLE_TIMES_FOR_GENERATION.length)];
+          const availableTimes = [...POSSIBLE_TIMES_FOR_GENERATION];
+          
+          while(timesForThisHall.length < numShowtimesInHall && availableTimes.length > 0) {
+            const randomTimeIndex = Math.floor(Math.random() * availableTimes.length);
+            const randomTime = availableTimes.splice(randomTimeIndex, 1)[0];
             if (!timesForThisHall.includes(randomTime)) {
                 timesForThisHall.push(randomTime);
             }
