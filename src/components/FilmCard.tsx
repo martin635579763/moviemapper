@@ -6,28 +6,24 @@ import type { Film } from '@/data/films';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Ticket } from 'lucide-react';
+import { FilmScheduleDialog } from './FilmScheduleDialog';
 
-// generateDataAiHint is no longer needed here as the poster is specific.
-// const generateDataAiHint = (genre: string): string => {
-//   return genre.toLowerCase().split(',').map(g => g.trim().replace(/\s+/g, '')).slice(0, 2).join(' ') || "movie";
-// };
-
-export const FilmCard: React.FC<FilmCardProps> = ({ film }) => {
+export const FilmCard: React.FC<{ film: Film }> = ({ film }) => {
   return (
     <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg">
       <CardHeader className="p-0 relative">
-        <Link href={`/film/${film.id}`} className="block group">
-          <div className="relative w-full aspect-[2/3]"> {/* Standard poster aspect ratio */}
+        <FilmScheduleDialog film={film}>
+          <div className="relative w-full aspect-[2/3] cursor-pointer group"> {/* Added cursor-pointer and group */}
             <Image
               src={film.posterUrl}
               alt={`Poster for ${film.title}`}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
               className="object-cover rounded-t-lg group-hover:scale-105 transition-transform duration-300"
-              data-ai-hint="movie poster" // Generic hint for specific poster
+              data-ai-hint="movie poster"
             />
           </div>
-        </Link>
+        </FilmScheduleDialog>
       </CardHeader>
       <CardContent className="p-4 flex-grow flex flex-col">
         <Link href={`/film/${film.id}`} className="group">

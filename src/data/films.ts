@@ -1,30 +1,31 @@
 
+export interface ScheduleEntry {
+  day: string;
+  time: string;
+  hallName: string;
+}
+
 export interface Film {
   id: string;
   title: string;
   description: string;
   posterUrl: string;
-  detailImageUrls: string[]; 
-  associatedLayoutName: string; 
-  duration: string; 
+  detailImageUrls: string[];
+  associatedLayoutName: string;
+  duration: string;
   genre: string;
+  schedule?: ScheduleEntry[];
 }
-
-// getUnsplashUrl is no longer needed for posters
-// const getUnsplashUrl = (keywords: string, width: number = 300, height: number = 450): string => {
-//   const firstKeyword = keywords.split(',')[0].trim().toLowerCase().replace(/\s+/g, '-');
-//   return `https://source.unsplash.com/${width}x${height}/?${firstKeyword}`;
-// };
 
 const getDetailImageUnsplashUrl = (keywords: string, width: number = 600, height: number = 400): string => {
   const relevantKeywords = keywords.split(',').map(k => k.trim().toLowerCase().replace(/\s+/g, '-')).slice(0,2).join(',');
-  return `https://source.unsplash.com/${width}x${height}/?${relevantKeywords},movie,scene`; // Added more generic terms
+  return `https://source.unsplash.com/${width}x${height}/?${relevantKeywords},movie,scene`;
 };
 
 export const sampleFilms: Film[] = [
   {
     id: '1',
-    title: 'Adventure in the Cosmos', // Was: Interstellar
+    title: 'Adventure in the Cosmos',
     description: 'An epic journey across galaxies to find a new home for humanity. Breathtaking visuals and a gripping storyline.',
     posterUrl: 'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg', // Interstellar poster
     detailImageUrls: [
@@ -34,10 +35,17 @@ export const sampleFilms: Film[] = [
     ],
     associatedLayoutName: 'Standard Cinema',
     duration: "2h 30m",
-    genre: "Sci-Fi, Adventure"
+    genre: "Sci-Fi, Adventure",
+    schedule: [
+      { day: "Today", time: "2:00 PM", hallName: "Hall A (Standard)" },
+      { day: "Today", time: "5:00 PM", hallName: "Hall A (Standard)" },
+      { day: "Today", time: "8:00 PM", hallName: "Hall B (Small)" },
+      { day: "Tomorrow", time: "3:00 PM", hallName: "Hall A (Standard)" },
+      { day: "Tomorrow", time: "6:00 PM", hallName: "Hall B (Small)" },
+    ]
   },
   {
-    id: '5', // New ID for the new film
+    id: '5',
     title: 'Echoes of the Past',
     description: 'A historian uncovers a hidden journal that leads to a forgotten city, revealing secrets that could rewrite history.',
     posterUrl: 'https://image.tmdb.org/t/p/w500/yhXy2l3xpiiNWCnOR9Y2T3MC22P.jpg', // The Mummy (1999) poster
@@ -47,11 +55,16 @@ export const sampleFilms: Film[] = [
     ],
     associatedLayoutName: 'Small Hall',
     duration: "2h 00m",
-    genre: "Adventure, Mystery"
+    genre: "Adventure, Mystery",
+    schedule: [
+      { day: "Today", time: "1:00 PM", hallName: "Hall B (Small)" },
+      { day: "Today", time: "4:00 PM", hallName: "Hall B (Small)" },
+      { day: "Tomorrow", time: "2:00 PM", hallName: "Hall B (Small)" },
+    ]
   },
   {
     id: '3',
-    title: 'VIP Premiere Night', // Was: La La Land
+    title: 'VIP Premiere Night',
     description: 'Experience the ultimate luxury in our exclusive VIP screening. An unforgettable night of cinema.',
     posterUrl: 'https://image.tmdb.org/t/p/w500/uDO8zWDhfWwoFdKS4fzkUJt0Rf0.jpg', // La La Land poster
     detailImageUrls: [
@@ -61,11 +74,16 @@ export const sampleFilms: Film[] = [
     ],
     associatedLayoutName: 'Special VIP Hall',
     duration: "2h 10m",
-    genre: "Drama, Romance"
+    genre: "Drama, Romance",
+    schedule: [
+      { day: "Today", time: "7:00 PM", hallName: "VIP Lounge" },
+      { day: "Tomorrow", time: "7:00 PM", hallName: "VIP Lounge" },
+      { day: "Friday", time: "8:00 PM", hallName: "VIP Lounge" },
+    ]
   },
   {
     id: '4',
-    title: 'The Last Stand', // Was: 1917
+    title: 'The Last Stand',
     description: 'Outnumbered and outgunned, a small group of heroes makes their final stand against an overwhelming force.',
     posterUrl: 'https://image.tmdb.org/t/p/w500/iZf0KyrE25z1sage4SYFLCCrMi9.jpg', // 1917 poster
     detailImageUrls: [
@@ -75,7 +93,12 @@ export const sampleFilms: Film[] = [
     ],
     associatedLayoutName: 'Standard Cinema',
     duration: "2h 05m",
-    genre: "Action, War"
+    genre: "Action, War",
+    schedule: [
+      { day: "Today", time: "12:00 PM", hallName: "Hall A (Standard)" },
+      { day: "Today", time: "3:30 PM", hallName: "Hall A (Standard)" },
+      { day: "Today", time: "9:00 PM", hallName: "Hall A (Standard)" },
+      { day: "Tomorrow", time: "1:00 PM", hallName: "Hall A (Standard)" },
+    ]
   }
 ];
-
