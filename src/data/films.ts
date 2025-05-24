@@ -6,7 +6,7 @@ export interface ScheduleEntry {
 }
 
 export interface Film {
-  id: string;
+  id:string;
   title: string;
   description: string;
   posterUrl: string;
@@ -17,10 +17,12 @@ export interface Film {
   schedule?: ScheduleEntry[];
 }
 
+// Helper to generate consistent Unsplash URLs for detail images
 const getDetailImageUnsplashUrl = (keywords: string, width: number = 600, height: number = 400): string => {
   const relevantKeywords = keywords.split(',').map(k => k.trim().toLowerCase().replace(/\s+/g, '-')).slice(0,2).join(',');
   return `https://source.unsplash.com/${width}x${height}/?${relevantKeywords},movie,scene`;
 };
+
 
 export const sampleFilms: Film[] = [
   {
@@ -37,11 +39,11 @@ export const sampleFilms: Film[] = [
     duration: "2h 30m",
     genre: "Sci-Fi, Adventure",
     schedule: [
-      { day: "Today", time: "2:00 PM", hallName: "Hall A (Standard)" },
-      { day: "Today", time: "5:00 PM", hallName: "Hall A (Standard)" },
-      { day: "Today", time: "8:00 PM", hallName: "Hall B (Small)" },
-      { day: "Tomorrow", time: "3:00 PM", hallName: "Hall A (Standard)" },
-      { day: "Tomorrow", time: "6:00 PM", hallName: "Hall B (Small)" },
+      { day: "Today", time: "2:00 PM", hallName: "Standard Cinema" },
+      { day: "Today", time: "5:00 PM", hallName: "Standard Cinema" },
+      { day: "Today", time: "8:00 PM", hallName: "Small Hall" },
+      { day: "Tomorrow", time: "3:00 PM", hallName: "Standard Cinema" },
+      { day: "Tomorrow", time: "6:00 PM", hallName: "Small Hall" },
     ]
   },
   {
@@ -57,9 +59,9 @@ export const sampleFilms: Film[] = [
     duration: "2h 00m",
     genre: "Adventure, Mystery",
     schedule: [
-      { day: "Today", time: "1:00 PM", hallName: "Hall B (Small)" },
-      { day: "Today", time: "4:00 PM", hallName: "Hall B (Small)" },
-      { day: "Tomorrow", time: "2:00 PM", hallName: "Hall B (Small)" },
+      { day: "Today", time: "1:00 PM", hallName: "Small Hall" },
+      { day: "Today", time: "4:00 PM", hallName: "Small Hall" },
+      { day: "Tomorrow", time: "2:00 PM", hallName: "Small Hall" },
     ]
   },
   {
@@ -76,9 +78,9 @@ export const sampleFilms: Film[] = [
     duration: "2h 10m",
     genre: "Drama, Romance",
     schedule: [
-      { day: "Today", time: "7:00 PM", hallName: "VIP Lounge" },
-      { day: "Tomorrow", time: "7:00 PM", hallName: "VIP Lounge" },
-      { day: "Friday", time: "8:00 PM", hallName: "VIP Lounge" },
+      { day: "Today", time: "7:00 PM", hallName: "Special VIP Hall" },
+      { day: "Tomorrow", time: "7:00 PM", hallName: "Special VIP Hall" },
+      { day: "Friday", time: "8:00 PM", hallName: "Special VIP Hall" },
     ]
   },
   {
@@ -95,10 +97,10 @@ export const sampleFilms: Film[] = [
     duration: "2h 05m",
     genre: "Action, War",
     schedule: [
-      { day: "Today", time: "12:00 PM", hallName: "Hall A (Standard)" },
-      { day: "Today", time: "3:30 PM", hallName: "Hall A (Standard)" },
-      { day: "Today", time: "9:00 PM", hallName: "Hall A (Standard)" },
-      { day: "Tomorrow", time: "1:00 PM", hallName: "Hall A (Standard)" },
+      { day: "Today", time: "12:00 PM", hallName: "Standard Cinema" },
+      { day: "Today", time: "3:30 PM", hallName: "Standard Cinema" },
+      { day: "Today", time: "9:00 PM", hallName: "Standard Cinema" },
+      { day: "Tomorrow", time: "1:00 PM", hallName: "Standard Cinema" },
     ]
   }
 ];
