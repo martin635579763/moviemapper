@@ -11,7 +11,7 @@ export interface Film {
   description: string;
   posterUrl: string;
   detailImageUrls: string[];
-  associatedLayoutName: string;
+  associatedLayoutName: string; // This is the default layout if no specific hall is chosen from schedule
   duration: string;
   genre: string;
   schedule?: ScheduleEntry[];
@@ -19,6 +19,7 @@ export interface Film {
 
 // Helper to generate consistent Unsplash URLs for detail images
 const getDetailImageUnsplashUrl = (keywords: string, width: number = 600, height: number = 400): string => {
+  // Simplified keywords for Unsplash
   const relevantKeywords = keywords.split(',').map(k => k.trim().toLowerCase().replace(/\s+/g, '-')).slice(0,2).join(',');
   return `https://source.unsplash.com/${width}x${height}/?${relevantKeywords},movie,scene`;
 };
@@ -35,15 +36,15 @@ export const sampleFilms: Film[] = [
       getDetailImageUnsplashUrl('spaceship,cockpit', 600, 400),
       getDetailImageUnsplashUrl('alien,planet', 600, 400),
     ],
-    associatedLayoutName: 'Standard Cinema',
+    associatedLayoutName: 'Standard Cinema', // Default if no schedule choice
     duration: "2h 30m",
     genre: "Sci-Fi, Adventure",
     schedule: [
-      { day: "Today", time: "2:00 PM", hallName: "Standard Cinema" },
-      { day: "Today", time: "5:00 PM", hallName: "Standard Cinema" },
-      { day: "Today", time: "8:00 PM", hallName: "Small Hall" },
-      { day: "Tomorrow", time: "3:00 PM", hallName: "Standard Cinema" },
-      { day: "Tomorrow", time: "6:00 PM", hallName: "Small Hall" },
+      { day: "Today", time: "2:00 PM", hallName: "hall one" },
+      { day: "Today", time: "5:00 PM", hallName: "hall two" },
+      { day: "Today", time: "8:00 PM", hallName: "hall one" },
+      { day: "Tomorrow", time: "3:00 PM", hallName: "hall two" },
+      { day: "Tomorrow", time: "6:00 PM", hallName: "hall one" },
     ]
   },
   {
@@ -55,13 +56,13 @@ export const sampleFilms: Film[] = [
       getDetailImageUnsplashUrl('ancient ruins,desert', 600, 400),
       getDetailImageUnsplashUrl('old map,treasure', 600, 400),
     ],
-    associatedLayoutName: 'Small Hall',
+    associatedLayoutName: 'Small Hall', // Default if no schedule choice
     duration: "2h 00m",
     genre: "Adventure, Mystery",
     schedule: [
-      { day: "Today", time: "1:00 PM", hallName: "Small Hall" },
-      { day: "Today", time: "4:00 PM", hallName: "Small Hall" },
-      { day: "Tomorrow", time: "2:00 PM", hallName: "Small Hall" },
+      { day: "Today", time: "1:00 PM", hallName: "hall two" },
+      { day: "Today", time: "4:00 PM", hallName: "hall one" },
+      { day: "Tomorrow", time: "2:00 PM", hallName: "hall two" },
     ]
   },
   {
@@ -74,13 +75,13 @@ export const sampleFilms: Film[] = [
       getDetailImageUnsplashUrl('luxury,theater', 600, 400),
       getDetailImageUnsplashUrl('movie,premiere', 600, 400),
     ],
-    associatedLayoutName: 'Special VIP Hall',
+    associatedLayoutName: 'Special VIP Hall', // Default if no schedule choice
     duration: "2h 10m",
     genre: "Drama, Romance",
     schedule: [
-      { day: "Today", time: "7:00 PM", hallName: "Special VIP Hall" },
-      { day: "Tomorrow", time: "7:00 PM", hallName: "Special VIP Hall" },
-      { day: "Friday", time: "8:00 PM", hallName: "Special VIP Hall" },
+      { day: "Today", time: "7:00 PM", hallName: "hall one" }, // Assuming "hall one" could be your VIP hall
+      { day: "Tomorrow", time: "7:00 PM", hallName: "hall one" },
+      { day: "Friday", time: "8:00 PM", hallName: "hall two" }, // Or "hall two" if that's VIP
     ]
   },
   {
@@ -93,14 +94,14 @@ export const sampleFilms: Film[] = [
       getDetailImageUnsplashUrl('heroic,battle', 600, 400),
       getDetailImageUnsplashUrl('soldiers,action', 600, 400),
     ],
-    associatedLayoutName: 'Standard Cinema',
+    associatedLayoutName: 'Standard Cinema', // Default if no schedule choice
     duration: "2h 05m",
     genre: "Action, War",
     schedule: [
-      { day: "Today", time: "12:00 PM", hallName: "Standard Cinema" },
-      { day: "Today", time: "3:30 PM", hallName: "Standard Cinema" },
-      { day: "Today", time: "9:00 PM", hallName: "Standard Cinema" },
-      { day: "Tomorrow", time: "1:00 PM", hallName: "Standard Cinema" },
+      { day: "Today", time: "12:00 PM", hallName: "hall two" },
+      { day: "Today", time: "3:30 PM", hallName: "hall one" },
+      { day: "Today", time: "9:00 PM", hallName: "hall two" },
+      { day: "Tomorrow", time: "1:00 PM", hallName: "hall one" },
     ]
   }
 ];
