@@ -6,7 +6,7 @@ import { getSampleFilmsWithDynamicSchedules, type Film } from '@/data/films';
 import { FilmCard } from '@/components/FilmCard';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { UserCog, Clapperboard, LogIn, LogOut } from 'lucide-react'; 
+import { UserCog, Clapperboard, LogIn, LogOut, Film as FilmIcon, Settings2 } from 'lucide-react';
 import { useAuthContext } from '@/contexts/AuthContext';
 
 export default function HomePage() {
@@ -35,6 +35,11 @@ export default function HomePage() {
                     <UserCog className="mr-2 h-5 w-5" /> Layout Editor
                   </Link>
                 </Button>
+                <Button asChild variant="outline" size="lg" className="shadow-md hover:shadow-lg transition-shadow">
+                  <Link href="/admin/film-halls">
+                    <Settings2 className="mr-2 h-5 w-5" /> Film Hall Config
+                  </Link>
+                </Button>
                 <Button variant="ghost" size="lg" onClick={logoutManager} className="shadow-md hover:shadow-lg transition-shadow">
                   <LogOut className="mr-2 h-5 w-5" /> Logout
                 </Button>
@@ -49,7 +54,9 @@ export default function HomePage() {
 
         {filmsToDisplay.length === 0 && (
           <div className="text-center py-20">
-            <p className="text-xl text-muted-foreground">No films available right now, or still loading schedules. Check back soon!</p>
+             <FilmIcon className="w-16 h-16 text-primary mx-auto mb-4 animate-spin" />
+            <p className="text-xl text-muted-foreground">Loading films or no films available with current hall configurations.</p>
+            {isManager && <p className="text-sm text-muted-foreground mt-2">Managers: Ensure halls are saved and configured in Film Hall Config.</p>}
           </div>
         )}
 
