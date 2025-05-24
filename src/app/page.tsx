@@ -13,7 +13,8 @@ interface CategorizedFilms {
 }
 
 export default function HomePage() {
-  const categoriesToShow: string[] = ['Sci-Fi', 'Mystery']; // Define categories to display
+  // Updated categories to ensure all 4 sample films are shown
+  const categoriesToShow: string[] = ['Sci-Fi', 'Mystery', 'Action', 'Drama']; 
 
   const categorizedFilms: CategorizedFilms[] = categoriesToShow.map(category => {
     return {
