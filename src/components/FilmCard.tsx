@@ -33,10 +33,10 @@ export const FilmCard: React.FC<{ film: Film }> = ({ film }) => {
         {/* Instructional label added */}
         <div className="mt-auto pt-3 border-t border-border/50 text-center">
           <p className="text-xs text-primary/90 font-medium leading-tight">
-            Tap poster for showtimes.
+            Tap poster for showtimes &amp; halls.
           </p>
           <p className="text-xs text-primary/90 font-medium leading-tight">
-            Tap title to book tickets.
+            Tap title to pick your seats!
           </p>
         </div>
       </CardContent>
