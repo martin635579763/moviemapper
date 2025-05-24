@@ -3,9 +3,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Film } from '@/data/films';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Ticket } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// Button and Ticket imports are no longer used
 import { FilmScheduleDialog } from './FilmScheduleDialog';
 
 export const FilmCard: React.FC<{ film: Film }> = ({ film }) => {
@@ -13,7 +12,7 @@ export const FilmCard: React.FC<{ film: Film }> = ({ film }) => {
     <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg">
       <CardHeader className="p-0 relative">
         <FilmScheduleDialog film={film}>
-          <div className="relative w-full aspect-[2/3] cursor-pointer group"> {/* Added cursor-pointer and group */}
+          <div className="relative w-full aspect-[2/3] cursor-pointer group">
             <Image
               src={film.posterUrl}
               alt={`Poster for ${film.title}`}
@@ -31,14 +30,17 @@ export const FilmCard: React.FC<{ film: Film }> = ({ film }) => {
         </Link>
         <p className="text-xs text-muted-foreground mb-2">{film.genre} &bull; {film.duration}</p>
         <p className="text-sm text-foreground line-clamp-3 flex-grow mb-3">{film.description}</p>
+        {/* Instructional label added */}
+        <div className="mt-auto pt-3 border-t border-border/50 text-center">
+          <p className="text-xs text-primary/90 font-medium leading-tight">
+            Tap poster for showtimes.
+          </p>
+          <p className="text-xs text-primary/90 font-medium leading-tight">
+            Tap title to book tickets.
+          </p>
+        </div>
       </CardContent>
-      <CardFooter className="p-4 border-t mt-auto w-full">
-        <Button asChild className="w-full">
-          <Link href={`/film/${film.id}`}>
-            <Ticket className="mr-2 h-4 w-4" /> Get Tickets
-          </Link>
-        </Button>
-      </CardFooter>
+      {/* CardFooter with the Button has been removed */}
     </Card>
   );
 };
