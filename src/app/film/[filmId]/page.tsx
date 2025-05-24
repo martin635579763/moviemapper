@@ -22,7 +22,7 @@ const generateDataAiHint = (genre: string): string => {
 
 // This component will consume the LayoutContext
 const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayout; initialHallNameOverride: string | null }> = ({ film, initialLayout, initialHallNameOverride }) => {
-  const { loadLayout, layout, getStoredLayoutNames, loadLayoutFromStorage } = useLayoutContext();
+  const { loadLayout, layout, getStoredLayoutNames, loadLayoutFromStorage, clearSeatSelection } = useLayoutContext();
   const [availableLayoutNames, setAvailableLayoutNames] = useState<string[]>([]);
 
   useEffect(() => {
@@ -31,14 +31,14 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
       if (sampleOverride) {
         loadLayout(JSON.parse(JSON.stringify(sampleOverride)));
       } else {
-        // Attempt to load from storage, getStoredLayoutNames might be useful here
-        // For now, directly call loadLayoutFromStorage, it has its own error handling
         loadLayoutFromStorage(initialHallNameOverride);
       }
     } else if (initialLayout) {
        loadLayout(JSON.parse(JSON.stringify(initialLayout))); // Deep copy
     }
-  }, [initialLayout, initialHallNameOverride, loadLayout, loadLayoutFromStorage]);
+    // Clear selections when the layout changes or component initializes
+    if (typeof clearSeatSelection === 'function') clearSeatSelection();
+  }, [initialLayout, initialHallNameOverride, loadLayout, loadLayoutFromStorage, clearSeatSelection]);
 
   useEffect(() => {
     const sampleNames = sampleLayouts.map(l => l.name);
@@ -57,6 +57,8 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
     } else {
       loadLayoutFromStorage(selectedLayoutName);
     }
+    // Clear selections when hall changes
+     if (typeof clearSeatSelection === 'function') clearSeatSelection();
   };
 
   return (
@@ -90,29 +92,7 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
           </div>
           <p className="text-foreground text-base leading-relaxed mb-6">{film.description}</p>
           
-          {film.detailImageUrls && film.detailImageUrls.length > 0 && (
-            <div className="mt-auto pt-6 border-t">
-              <h3 className="text-lg font-semibold text-primary mb-3 flex items-center">
-                <ImageIcon className="mr-2 h-5 w-5" />
-                More Images
-              </h3>
-              <div className="grid grid-cols-2 gap-3">
-                {film.detailImageUrls.map((url, index) => (
-                  <div key={index} className="relative aspect-video rounded-md overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                    <Image
-                      src={url}
-                      alt={`Detail image ${index + 1} for ${film.title}`}
-                      fill
-                      sizes="(max-width: 768px) 50vw, (max-width: 1280px) 25vw, 15vw"
-                      className="object-cover"
-                      data-ai-hint={`${generateDataAiHint(film.genre)} scene`}
-                      loading="lazy"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Removed "More Images" gallery section */}
         </CardContent>
       </Card>
 
@@ -174,24 +154,22 @@ function FilmPageContent() {
 
     if (initialHallNameOverrideForInterface) {
       layoutToLoad = sampleLayouts.find(l => l.name === initialHallNameOverrideForInterface);
-      // If layoutToLoad is still undefined, it means initialHallNameOverrideForInterface is for a stored layout.
-      // The FilmTicketBookingInterface will handle trying to load it from storage.
     }
 
     if (!layoutToLoad && currentFilm.associatedLayoutName) {
       layoutToLoad = sampleLayouts.find(l => l.name === currentFilm.associatedLayoutName);
     }
 
-    if (!layoutToLoad) { // Fallback
+    if (!layoutToLoad) { 
       layoutToLoad = sampleLayouts[0];
-      // If we fell back and there was an override, but it didn't match any sample,
-      // keep initialHallNameOverrideForInterface so FilmTicketBookingInterface tries storage.
-      // Otherwise, if the fallback IS the override, or there was no override, nullify it.
       if (initialHallNameOverrideForInterface && layoutToLoad.name === initialHallNameOverrideForInterface) {
         initialHallNameOverrideForInterface = null;
       }
     } else if (layoutToLoad && initialHallNameOverrideForInterface && layoutToLoad.name !== initialHallNameOverrideForInterface) {
       // A sample layout was found matching the query param, so no need for storage override.
+      // Keep initialHallNameOverrideForInterface as it might be for a stored layout.
+    } else if (layoutToLoad && initialHallNameOverrideForInterface && layoutToLoad.name === initialHallNameOverrideForInterface) {
+      // The initialHallNameOverride matches the loaded sample layout.
       initialHallNameOverrideForInterface = null;
     }
     
@@ -220,7 +198,7 @@ function FilmPageContent() {
   }
 
   return (
-    <LayoutProvider key={`${filmId}-${hallNameFromQuery}`}> 
+    <LayoutProvider key={`${filmId}-${hallNameFromQuery || layoutToLoad.name}`}> 
        <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 text-foreground">
         <div className="p-4 md:p-6 sticky top-0 bg-background/80 backdrop-blur-md z-50 shadow-sm">
             <Button asChild variant="ghost" size="sm">
@@ -238,7 +216,7 @@ function FilmPageContent() {
 export default function FilmPage() {
   // Suspense is needed because useSearchParams() might suspend.
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div>Loading film page...</div>}>
       <FilmPageContent />
     </Suspense>
   );

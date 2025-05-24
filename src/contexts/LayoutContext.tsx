@@ -2,7 +2,7 @@
 "use client";
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { HallLayout, CellData, EditorTool, SeatCategory, PreviewMode, LayoutContextType } from '@/types/layout'; // SeatStatus removed
+import type { HallLayout, CellData, EditorTool, SeatCategory, PreviewMode, LayoutContextType, SeatStatus } from '@/types/layout';
 import { createDefaultLayout, calculatePreviewStates, DEFAULT_ROWS, DEFAULT_COLS } from '@/lib/layout-utils';
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,13 +16,21 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
   const [selectedTool, setSelectedTool] = useState<EditorTool>('seat');
   const [selectedSeatCategory, setSelectedSeatCategory] = useState<SeatCategory>('standard');
   const [previewMode, setPreviewMode] = useState<PreviewMode>('normal');
-  // const [selectedSeatsForPurchase, setSelectedSeatsForPurchase] = useState<CellData[]>([]); // Removed
+  const [selectedSeatsForPurchase, setSelectedSeatsForPurchase] = useState<CellData[]>([]);
   const { toast } = useToast();
 
   const initializeLayout = useCallback((rows: number, cols: number, name?: string) => {
-    setLayout(createDefaultLayout(rows, cols, name));
-    // setSelectedSeatsForPurchase([]); // Removed
-  }, []); // setSelectedSeatsForPurchase removed from deps
+    const newLayout = createDefaultLayout(rows, cols, name);
+    // Ensure all seats in a new layout are 'available'
+    newLayout.grid = newLayout.grid.map(row => row.map(cell => {
+      if (cell.type === 'seat' && !cell.status) {
+        return { ...cell, status: 'available' as SeatStatus };
+      }
+      return cell;
+    }));
+    setLayout(newLayout);
+    setSelectedSeatsForPurchase([]);
+  }, []);
 
   useEffect(() => {
     initializeLayout(DEFAULT_ROWS, DEFAULT_COLS);
@@ -34,76 +42,97 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       const cell = newGrid[row][col];
       let newScreenCellIds = [...prevLayout.screenCellIds];
 
-      if (cell.type === 'screen' && selectedTool !== 'screen') {
+      // Handle deselection if cell type changes from seat
+      if (cell.type === 'seat' && selectedTool !== 'seat' && selectedTool !== 'select') {
+        delete cell.status; // Remove status
+        setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id));
+      }
+       if (cell.type === 'screen' && selectedTool !== 'screen') {
         newScreenCellIds = newScreenCellIds.filter(id => id !== cell.id);
       }
-      
-      // Removed status-related logic for seat deselection if tool changes
-      // if (cell.type === 'seat' && selectedTool !== 'seat' && selectedTool !== 'select') {
-      //   delete cell.status;
-      //   setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id));
-      // }
       
       switch (selectedTool) {
         case 'seat':
           cell.type = 'seat';
           cell.category = selectedSeatCategory;
-          // delete cell.status; // No status to manage
+          cell.status = cell.status || 'available'; // Set to available if not already set (e.g. if it was empty)
           break;
         case 'aisle':
-          cell.type = 'aisle';
-          delete cell.category;
-          // delete cell.status; // No status to manage
-          // setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id)); // Removed
-          break;
         case 'screen':
-          cell.type = 'screen';
-          delete cell.category;
-          // delete cell.status; // No status to manage
-          if (!newScreenCellIds.includes(cell.id)) {
-            newScreenCellIds.push(cell.id);
-          }
-          // setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id)); // Removed
-          break;
         case 'eraser':
-          cell.type = 'empty';
+          const oldType = cell.type;
+          if (selectedTool === 'aisle') cell.type = 'aisle';
+          else if (selectedTool === 'screen') cell.type = 'screen';
+          else if (selectedTool === 'eraser') cell.type = 'empty';
+          
           delete cell.category;
-          // delete cell.status; // No status to manage
-          // setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id)); // Removed
+          delete cell.status;
+          setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id));
+          
+          if (cell.type === 'screen' && !newScreenCellIds.includes(cell.id)) {
+            newScreenCellIds.push(cell.id);
+          } else if (oldType === 'screen' && cell.type !== 'screen') {
+             newScreenCellIds = newScreenCellIds.filter(id => id !== cell.id);
+          }
           break;
         case 'select':
           if (cell.type === 'seat') {
              if (cell.category !== selectedSeatCategory) {
                 cell.category = selectedSeatCategory;
              }
+             // Toggle selection via select tool is not part of this logic, handled by toggleSeatSelection
           }
           break;
       }
       return { ...prevLayout, grid: newGrid, screenCellIds: newScreenCellIds };
     });
-  }, [selectedTool, selectedSeatCategory]); // setSelectedSeatsForPurchase removed from deps
+  }, [selectedTool, selectedSeatCategory]);
   
-  const loadLayout = useCallback((newLayout: HallLayout) => {
+  const clearSeatSelection = useCallback(() => {
+    setLayout(prevLayout => ({
+      ...prevLayout,
+      grid: prevLayout.grid.map(row => row.map(cell => {
+        if (cell.type === 'seat' && cell.status === 'selected') {
+          return { ...cell, status: 'available' as SeatStatus };
+        }
+        return cell;
+      }))
+    }));
+    setSelectedSeatsForPurchase([]);
+  }, []);
+
+  const loadLayout = useCallback((newLayoutData: HallLayout) => {
     try {
-      if (!newLayout || !newLayout.grid || !newLayout.rows || !newLayout.cols) {
+      if (!newLayoutData || !newLayoutData.grid || !newLayoutData.rows || !newLayoutData.cols) {
         throw new Error("Invalid layout structure.");
       }
-      // Removed logic that added default status to seats
-      setLayout(newLayout);
-      // setSelectedSeatsForPurchase([]); // Removed
-      toast({ title: "Success", description: `Layout "${newLayout.name}" loaded.` });
+      const processedLayout = {
+        ...newLayoutData,
+        grid: newLayoutData.grid.map(row => row.map(cell => {
+          if (cell.type === 'seat' && !cell.status) { // Ensure seats have a status
+            return { ...cell, status: 'available' as SeatStatus };
+          }
+          return cell;
+        }))
+      };
+      setLayout(processedLayout);
+      clearSeatSelection();
+      toast({ title: "Success", description: `Layout "${processedLayout.name}" loaded.` });
     } catch (error) {
       console.error("Failed to load layout:", error);
       toast({ variant: "destructive", title: "Error", description: "Failed to load layout file. Ensure it's a valid JSON." });
     }
-  }, [toast]); // setSelectedSeatsForPurchase removed from deps
+  }, [toast, clearSeatSelection]);
 
   const exportLayout = () => {
     const layoutToExport = { ...layout };
     layoutToExport.grid = layoutToExport.grid.map(row => row.map(cell => {
-        const { isOccluded, hasGoodView, ...restOfCell } = cell; // status would be naturally excluded if not in CellData
+        const { isOccluded, hasGoodView, ...restOfCell } = cell;
+        if (restOfCell.type === 'seat' && restOfCell.status === 'selected') {
+          return { ...restOfCell, status: 'available' as SeatStatus };
+        }
         return restOfCell;
-    }))
+    }));
 
     const jsonString = JSON.stringify(layoutToExport, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
@@ -137,7 +166,11 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     
     const layoutToSave = { ...layout, name: saveName };
     layoutToSave.grid = layoutToSave.grid.map(row => row.map(cell => {
-        const { isOccluded, hasGoodView, ...restOfCell } = cell; // status naturally excluded
+        const { isOccluded, hasGoodView, ...restOfCell } = cell;
+        // When saving, convert 'selected' to 'available' to avoid saving temporary state
+        if (restOfCell.type === 'seat' && restOfCell.status === 'selected') {
+          return { ...restOfCell, status: 'available' as SeatStatus };
+        }
         return restOfCell;
     }));
 
@@ -146,7 +179,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     if (!names.includes(saveName)) {
       localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify([...names, saveName]));
     }
-    setLayout(prev => ({...prev, name: saveName}));
+    setLayout(prev => ({...prev, name: saveName})); // Update current layout name in context
     toast({ title: "Success", description: `Layout "${saveName}" saved to browser.` });
     return true;
   }, [layout, getStoredLayoutNames, toast]);
@@ -174,8 +207,38 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Success", description: `Layout "${layoutName}" deleted from browser.` });
   }, [getStoredLayoutNames, toast]);
 
-  // All ticket purchasing related functions removed:
-  // toggleSeatSelection, confirmTicketPurchase, clearSeatSelection
+  const toggleSeatSelection = useCallback((rowIndex: number, colIndex: number) => {
+    setLayout(prevLayout => {
+      const newGrid = prevLayout.grid.map(r => r.map(c => ({...c})));
+      const cell = newGrid[rowIndex][colIndex];
+
+      if (cell.type !== 'seat' || cell.status === 'sold') return prevLayout;
+
+      if (cell.status === 'available') {
+        cell.status = 'selected';
+        setSelectedSeatsForPurchase(prevSelected => [...prevSelected, cell]);
+      } else if (cell.status === 'selected') {
+        cell.status = 'available';
+        setSelectedSeatsForPurchase(prevSelected => prevSelected.filter(s => s.id !== cell.id));
+      }
+      return { ...prevLayout, grid: newGrid };
+    });
+  }, []);
+
+  const confirmTicketPurchase = useCallback(() => {
+    setLayout(prevLayout => {
+      const newGrid = prevLayout.grid.map(row => row.map(cell => {
+        if (selectedSeatsForPurchase.find(s => s.id === cell.id)) {
+          return { ...cell, status: 'sold' as SeatStatus };
+        }
+        return cell;
+      }));
+      return { ...prevLayout, grid: newGrid };
+    });
+    setSelectedSeatsForPurchase([]);
+    toast({ title: "Purchase Confirmed!", description: "Your selected seats are now booked." });
+  }, [selectedSeatsForPurchase, toast]);
+
 
   return (
     <LayoutContext.Provider value={{
@@ -186,7 +249,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       initializeLayout, updateCell,
       loadLayout, exportLayout,
       saveLayoutToStorage, loadLayoutFromStorage, deleteStoredLayout, getStoredLayoutNames,
-      // selectedSeatsForPurchase, toggleSeatSelection, confirmTicketPurchase, clearSeatSelection // Removed
+      selectedSeatsForPurchase, toggleSeatSelection, confirmTicketPurchase, clearSeatSelection
     }}>
       {children}
     </LayoutContext.Provider>

@@ -3,13 +3,13 @@ export type CellType = 'empty' | 'seat' | 'aisle' | 'screen';
 export type SeatCategory = 'standard' | 'premium' | 'accessible' | 'loveseat';
 export type EditorTool = 'select' | 'seat' | 'aisle' | 'screen' | 'eraser';
 export type PreviewMode = 'normal' | 'screen-view' | 'occlusion';
-// export type SeatStatus = 'available' | 'selected' | 'sold'; // Removed
+export type SeatStatus = 'available' | 'selected' | 'sold';
 
 export interface CellData {
   id: string; // e.g., "r0c0"
   type: CellType;
   category?: SeatCategory; // For seats
-  // status?: SeatStatus; // For seats in ticket selling demo - Removed
+  status?: SeatStatus; // For seats in ticket selling demo
   isOccluded?: boolean; 
   hasGoodView?: boolean; 
 }
@@ -41,9 +41,9 @@ export interface LayoutContextType {
   deleteStoredLayout: (layoutName: string) => void;
   getStoredLayoutNames: () => string[];
 
-  // Removed ticket purchasing related functions and state
-  // selectedSeatsForPurchase: CellData[];
-  // toggleSeatSelection: (row: number, col: number) => void;
-  // confirmTicketPurchase: () => void;
-  // clearSeatSelection: () => void;
+  // Ticket purchasing related functions and state
+  selectedSeatsForPurchase: CellData[];
+  toggleSeatSelection: (row: number, col: number) => void;
+  confirmTicketPurchase: () => void;
+  clearSeatSelection: () => void;
 }
