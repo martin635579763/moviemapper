@@ -37,18 +37,17 @@ export const sampleFilms: Film[] = [
     genre: "Sci-Fi, Adventure"
   },
   {
-    id: '2',
-    title: 'Mystery of the Old Manor', // Was: Knives Out
-    description: 'A detective uncovers dark secrets in an ancient, sprawling estate. Every shadow hides a clue.',
-    posterUrl: 'https://image.tmdb.org/t/p/w500/pThyQovXQrw2m0s9x82twPx4hcw.jpg', // Knives Out poster
+    id: '5', // New ID for the new film
+    title: 'Echoes of the Past',
+    description: 'A historian uncovers a hidden journal that leads to a forgotten city, revealing secrets that could rewrite history.',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/yhXy2l3xpiiNWCnOR9Y2T3MC22P.jpg', // The Mummy (1999) poster
     detailImageUrls: [
-      getDetailImageUnsplashUrl('haunted,house', 600, 400),
-      getDetailImageUnsplashUrl('detective,noir', 600, 400),
-      getDetailImageUnsplashUrl('secret,door', 600, 400),
+      getDetailImageUnsplashUrl('ancient ruins,desert', 600, 400),
+      getDetailImageUnsplashUrl('old map,treasure', 600, 400),
     ],
     associatedLayoutName: 'Small Hall',
-    duration: "1h 55m",
-    genre: "Mystery, Thriller"
+    duration: "2h 00m",
+    genre: "Adventure, Mystery"
   },
   {
     id: '3',
@@ -79,3 +78,4 @@ export const sampleFilms: Film[] = [
     genre: "Action, War"
   }
 ];
+
