@@ -58,21 +58,16 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
   const baseClasses = "w-full h-full flex items-center justify-center border border-border/50 rounded-sm transition-colors duration-150 relative overflow-hidden group";
   
   let shouldApplyAspectSquare: boolean;
+  const isMergedScreen = cell.type === 'screen' && style && typeof style.gridColumn === 'string' && style.gridColumn.startsWith('span');
 
-  if (isEditorCell) {
-    if (cell.type === 'screen' && style && typeof style.gridColumn === 'string' && style.gridColumn.startsWith('span')) {
-      shouldApplyAspectSquare = false;
-    } else {
-      shouldApplyAspectSquare = true;
-    }
-  } else if (isPreviewCell) {
-    if (cell.type === 'screen') {
-      shouldApplyAspectSquare = false;
-    } else {
-      shouldApplyAspectSquare = true;
-    }
+  if (isMergedScreen) {
+    // Merged screens (editor or preview) are NOT square cells, they span columns.
+    shouldApplyAspectSquare = false;
   } else {
-    shouldApplyAspectSquare = true; 
+    // All other cells, including single (non-merged) screen cells, default to square.
+    // For non-screen types, this ensures they remain square.
+    // For single screen cells, this makes their icon proportions consistent between editor and preview.
+    shouldApplyAspectSquare = true;
   }
 
   const editorHoverStyle = isEditorCell ? "hover:bg-secondary/50" : "";
@@ -95,7 +90,6 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
          cellDynamicStyle = cn(cellDynamicStyle, 'opacity-30 bg-red-500/30');
       }
 
-
       content = (
         <>
           {cell.category === 'accessible' ? <Accessibility className="w-3/4 h-3/4" /> : <SeatIcon className="w-3/4 h-3/4" />}
@@ -115,14 +109,16 @@ export const GridCell: React.FC<GridCellProps> = ({ cell, seatNumber, isEditorCe
       content = isEditorCell || isPreviewCell ? <AisleIcon className="w-1/2 h-1/2 text-muted-foreground" /> : null;
       break;
     case 'screen':
+      // Icon sizing depends on whether the screen is merged (not square cell) or single (square cell)
+      const iconSizingClass = !shouldApplyAspectSquare /* i.e., isMergedScreen */ ? "h-3/4 w-auto max-w-full" : "w-3/4 h-3/4";
+
       if (isPreviewCell) {
-        // Plain white block for preview
-        cellDynamicStyle = "bg-white dark:bg-gray-700 border border-slate-300 dark:border-slate-600"; 
-        content = <ScreenIcon className="w-full h-full text-gray-400 dark:text-gray-500" />; 
+        // Previewed screen cell: neutral background, icon sized like editor's
+        cellDynamicStyle = "border border-border/60 bg-muted/20"; 
+        content = <ScreenIcon className={`${iconSizingClass} text-muted-foreground/80`} />;
       } else { // Editor cell
-        cellDynamicStyle = "bg-foreground/80 text-background";
-        const iconClass = (isEditorCell && !shouldApplyAspectSquare) ? "h-3/4 w-auto max-w-full" : "w-3/4 h-3/4";
-        content = <ScreenIcon className={iconClass} />;
+        cellDynamicStyle = "bg-foreground/80 text-background"; // Editor screens have a distinct dark background
+        content = <ScreenIcon className={iconSizingClass} />; // Icon is white by default, sized based on merge status
       }
       break;
     case 'empty':
