@@ -9,12 +9,17 @@ export interface Film {
   genre: string;
 }
 
+const getUnsplashUrl = (keywords: string): string => {
+  const firstKeyword = keywords.split(',')[0].trim().toLowerCase().replace(/\s+/g, '-');
+  return `https://source.unsplash.com/300x450/?${firstKeyword}`;
+};
+
 export const sampleFilms: Film[] = [
   {
     id: '1',
     title: 'Adventure in the Cosmos',
     description: 'An epic journey across galaxies to find a new home for humanity. Breathtaking visuals and a gripping storyline.',
-    posterUrl: 'https://source.unsplash.com/300x450/?cosmos,space',
+    posterUrl: getUnsplashUrl('Sci-Fi, Adventure'),
     associatedLayoutName: 'Standard Cinema',
     duration: "2h 30m",
     genre: "Sci-Fi, Adventure"
@@ -23,7 +28,7 @@ export const sampleFilms: Film[] = [
     id: '2',
     title: 'Mystery of the Old Manor',
     description: 'A detective uncovers dark secrets in an ancient, sprawling estate. Every shadow hides a clue.',
-    posterUrl: 'https://source.unsplash.com/300x450/?manor,mystery',
+    posterUrl: getUnsplashUrl('Mystery, Thriller'),
     associatedLayoutName: 'Small Hall',
     duration: "1h 55m",
     genre: "Mystery, Thriller"
@@ -32,7 +37,7 @@ export const sampleFilms: Film[] = [
     id: '3',
     title: 'VIP Premiere Night',
     description: 'Experience the ultimate luxury in our exclusive VIP screening. An unforgettable night of cinema.',
-    posterUrl: 'https://source.unsplash.com/300x450/?cinema,luxury',
+    posterUrl: getUnsplashUrl('Drama, Romance'), // Using "drama" as keyword
     associatedLayoutName: 'Special VIP Hall',
     duration: "2h 10m",
     genre: "Drama, Romance"
@@ -41,7 +46,7 @@ export const sampleFilms: Film[] = [
     id: '4',
     title: 'The Last Stand',
     description: 'Outnumbered and outgunned, a small group of heroes makes their final stand against an overwhelming force.',
-    posterUrl: 'https://source.unsplash.com/300x450/?battle,soldiers',
+    posterUrl: getUnsplashUrl('Action, War'),
     associatedLayoutName: 'Standard Cinema',
     duration: "2h 05m",
     genre: "Action, War"

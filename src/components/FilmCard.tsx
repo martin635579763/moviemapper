@@ -11,6 +11,10 @@ interface FilmCardProps {
   film: Film;
 }
 
+const generateDataAiHint = (genre: string): string => {
+  return genre.toLowerCase().split(',').map(g => g.trim().replace(/\s+/g, '')).slice(0, 2).join(' ') || "movie";
+};
+
 export const FilmCard: React.FC<FilmCardProps> = ({ film }) => {
   return (
     <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg">
@@ -23,7 +27,7 @@ export const FilmCard: React.FC<FilmCardProps> = ({ film }) => {
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
               className="object-cover rounded-t-lg group-hover:scale-105 transition-transform duration-300"
-              data-ai-hint={film.genre.split(',')[0].toLowerCase().replace(/\s+/g, '') || "movie"}
+              data-ai-hint={generateDataAiHint(film.genre)}
             />
           </div>
         </Link>

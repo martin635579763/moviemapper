@@ -12,29 +12,28 @@ import type { HallLayout } from '@/types/layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, Clock, Ticket as TicketIconLucide } from 'lucide-react'; // Removed ChevronDown as it's not used directly here.
+import { ArrowLeft, CalendarDays, Clock, Ticket as TicketIconLucide } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 
+const generateDataAiHint = (genre: string): string => {
+  return genre.toLowerCase().split(',').map(g => g.trim().replace(/\s+/g, '')).slice(0, 2).join(' ') || "movie";
+};
+
 // This component will consume the LayoutContext
 const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayout }> = ({ film, initialLayout }) => {
-  const { loadLayout, layout, getStoredLayoutNames, loadLayoutFromStorage } = useLayoutContext(); // Removed clearSeatSelection
+  const { loadLayout, layout, getStoredLayoutNames, loadLayoutFromStorage } = useLayoutContext();
   const [availableLayoutNames, setAvailableLayoutNames] = useState<string[]>([]);
 
   useEffect(() => {
-    // This effect now primarily runs when initialLayout (i.e., the film) changes.
-    // It loads the film's default layout. Subsequent user selections via the dropdown
-    // will change layout in context but won't cause this effect to revert the choice,
-    // as initialLayout and loadLayout (the function) won't have changed.
     if (initialLayout) {
        loadLayout(JSON.parse(JSON.stringify(initialLayout))); // Deep copy
     }
-  }, [initialLayout, loadLayout]); // Removed `layout` from dependencies
+  }, [initialLayout, loadLayout]);
 
   useEffect(() => {
     const sampleNames = sampleLayouts.map(l => l.name);
     const storedNames = getStoredLayoutNames();
-    // Combine and remove duplicates
     const allNames = Array.from(new Set([...sampleNames, ...storedNames]));
     setAvailableLayoutNames(allNames.sort());
   }, [getStoredLayoutNames]);
@@ -47,10 +46,9 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
     if (sampleLayoutToLoad) {
       loadLayout(JSON.parse(JSON.stringify(sampleLayoutToLoad))); // Deep copy
     } else {
-      // If not a sample layout, assume it's a stored layout
       loadLayoutFromStorage(selectedLayoutName);
     }
-    // clearSeatSelection(); // Removed as it no longer exists
+    // clearSeatSelection(); // Removed as it no longer exists in context
   };
 
   return (
@@ -65,7 +63,7 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
               className="object-cover"
-              data-ai-hint={film.genre.split(',')[0].toLowerCase().replace(/\s+/g, '') || "movie"}
+              data-ai-hint={generateDataAiHint(film.genre)}
               priority
             />
           </div>
@@ -120,7 +118,7 @@ const FilmTicketBookingInterface: React.FC<{ film: Film; initialLayout: HallLayo
         </div>
         <div className="flex-grow mt-1 rounded-lg overflow-hidden shadow-md">
           <div className="h-full min-h-[400px] lg:min-h-[500px] flex flex-col">
-             <LayoutPreview /> {/* LayoutPreview uses the context for layout data and interactions */}
+             <LayoutPreview />
           </div>
         </div>
       </div>
