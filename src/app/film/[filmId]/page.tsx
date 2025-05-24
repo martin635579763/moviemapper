@@ -13,13 +13,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft, CalendarDays, Clock, Ticket as TicketIconLucide, Info } from 'lucide-react';
-// Select components are no longer needed here as the dropdown is removed
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-// import { Label } from '@/components/ui/label';
 
 interface FilmTicketBookingInterfaceProps {
   film: Film;
-  initialLayout: HallLayout;
+  initialLayout: HallLayout | undefined; // Can be undefined if hallNameFromQuery is for a stored layout
   initialHallNameOverride: string | null;
   selectedDay: string | null;
   selectedTime: string | null;
@@ -28,13 +25,6 @@ interface FilmTicketBookingInterfaceProps {
 const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({ film, initialLayout, initialHallNameOverride, selectedDay, selectedTime }) => {
   const { layout, loadLayout, loadLayoutFromStorage, clearSeatSelection } = useLayoutContext();
   
-  // Dropdown logic removed
-  // const allAvailableLayoutNamesForDropdown = useMemo(() => {
-  //     const sampleNames = sampleLayouts.map(l => l.name);
-  //     const combinedNames = Array.from(new Set([...sampleNames, ...(storedLayoutNames || [])]));
-  //     return combinedNames.sort();
-  // }, [storedLayoutNames]);
-
   useEffect(() => {
     if (initialHallNameOverride) {
       const sampleOverride = sampleLayouts.find(l => l.name === initialHallNameOverride);
@@ -46,41 +36,27 @@ const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({
     } else if (initialLayout) {
        loadLayout(JSON.parse(JSON.stringify(initialLayout))); // Deep copy
     }
-    if (typeof clearSeatSelection === 'function') clearSeatSelection();
-  }, [initialLayout, initialHallNameOverride, loadLayout, loadLayoutFromStorage, clearSeatSelection]);
-
-
-  // handleHallSelectionChange function removed
-  // const handleHallSelectionChange = (selectedLayoutName: string) => {
-  //   if (!selectedLayoutName || (layout && selectedLayoutName === layout.name)) return;
-
-  //   const sampleLayoutToLoad = sampleLayouts.find(sl => sl.name === selectedLayoutName);
-  //   if (sampleLayoutToLoad) {
-  //     loadLayout(JSON.parse(JSON.stringify(sampleLayoutToLoad))); 
-  //   } else {
-  //     loadLayoutFromStorage(selectedLayoutName);
-  //   }
-  //    if (typeof clearSeatSelection === 'function') clearSeatSelection();
-  // };
+    // clearSeatSelection was removed from context, ensure it's not called if re-added without full logic.
+    // if (typeof clearSeatSelection === 'function') clearSeatSelection(); 
+  }, [initialLayout, initialHallNameOverride, loadLayout, loadLayoutFromStorage, sampleLayouts]); // Added sampleLayouts
 
   return (
     <div className="flex flex-col xl:flex-row gap-6 p-4 md:p-6 max-w-screen-2xl mx-auto">
-      {/* Film Details Section - Smaller Poster */}
-      <Card className="xl:w-[320px] shrink-0 shadow-xl rounded-lg overflow-hidden flex flex-col self-start"> {/* Adjusted width */}
+      <Card className="xl:w-[320px] shrink-0 shadow-xl rounded-lg overflow-hidden flex flex-col self-start">
         <CardHeader className="p-0">
           <div className="relative w-full aspect-[2/3]">
             <Image
               src={film.posterUrl}
               alt={`Poster for ${film.title}`}
               fill
-              sizes="(max-width: 360px) 100vw, 320px"  // Adjusted sizes
+              sizes="(max-width: 320px) 100vw, 320px"
               className="object-cover"
               data-ai-hint="movie poster"
               priority
             />
           </div>
         </CardHeader>
-        <CardContent className="p-5 flex-grow"> {/* Adjusted padding */}
+        <CardContent className="p-5 flex-grow">
           <CardTitle className="text-xl md:text-2xl font-bold mb-2 line-clamp-2">{film.title}</CardTitle>
           <div className="space-y-1 text-xs text-muted-foreground mb-3">
             <div className="flex items-center">
@@ -92,11 +68,10 @@ const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({
               <span>{film.duration}</span>
             </div>
           </div>
-          <p className="text-foreground text-sm leading-relaxed line-clamp-5">{film.description}</p> {/* Added line-clamp */}
+          <p className="text-foreground text-sm leading-relaxed line-clamp-5">{film.description}</p>
         </CardContent>
       </Card>
 
-      {/* Seat Selection & Booking Info Section */}
       <div className="flex-grow flex flex-col">
         <Card className="mb-4 shadow-md">
           <CardHeader>
@@ -115,7 +90,6 @@ const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({
         <div className="mb-4">
             <h2 className="text-2xl font-semibold text-primary mb-1">Select Your Seats</h2>
             <p className="text-sm text-muted-foreground">The layout for <strong>{layout?.name || 'the selected hall'}</strong> is shown below.</p>
-             {/* Dropdown for changing hall layout removed */}
         </div>
         <div className="flex-grow mt-1 rounded-lg overflow-hidden shadow-md">
           <div className="h-full min-h-[400px] lg:min-h-[500px] flex flex-col">
@@ -145,8 +119,6 @@ function FilmPageContent() {
 
     if (initialHallNameOverrideForInterface) {
       layoutToLoad = sampleLayouts.find(l => l.name === initialHallNameOverrideForInterface);
-      // If not found in samples, initialHallNameOverrideForInterface will be passed to FilmTicketBookingInterface
-      // which will then try to load it from storage.
     }
 
     if (!layoutToLoad && currentFilm.associatedLayoutName) {
@@ -154,20 +126,15 @@ function FilmPageContent() {
     }
 
     if (!layoutToLoad && !initialHallNameOverrideForInterface) { 
-      // Fallback to default if no specific hall from query and no associated layout found (or no associatedLayoutName)
       layoutToLoad = sampleLayouts[0];
     }
-    // If layoutToLoad is still undefined here, it means a hall was specified in query,
-    // it wasn't a sample, so it should be loaded from storage by FilmTicketBookingInterface.
-    // In this case, we pass initialLayout as undefined (or the default if no query)
-    // and let initialHallNameOverrideForInterface drive the loading in the child component.
     
     return { 
       film: currentFilm, 
       layoutToLoad: layoutToLoad, 
       initialHallNameOverride: initialHallNameOverrideForInterface 
     };
-  }, [filmId, hallNameFromQuery]);
+  }, [filmId, hallNameFromQuery, sampleFilms, sampleLayouts]); // Added sampleFilms and sampleLayouts
 
   const { film, layoutToLoad, initialHallNameOverride } = filmData;
 
@@ -189,9 +156,11 @@ function FilmPageContent() {
         </div>
     );
   }
-
-  const finalInitialLayout = layoutToLoad || (initialHallNameOverride ? sampleLayouts[0] : sampleLayouts[0]);
-
+  
+  // If initialHallNameOverride is present and not a sample, layoutToLoad will be undefined.
+  // FilmTicketBookingInterface will then use initialHallNameOverride to load from storage.
+  // If initialHallNameOverride is null, layoutToLoad will be either the associated sample or the default sample.
+  const finalInitialLayoutProp = layoutToLoad;
 
   return (
     <LayoutProvider key={`${filmId}-${hallNameFromQuery || film.associatedLayoutName || 'defaultHall'}-${dayFromQuery}-${timeFromQuery}`}> 
@@ -205,7 +174,7 @@ function FilmPageContent() {
         </div>
         <FilmTicketBookingInterface 
           film={film} 
-          initialLayout={finalInitialLayout!} 
+          initialLayout={finalInitialLayoutProp} 
           initialHallNameOverride={initialHallNameOverride}
           selectedDay={dayFromQuery ? decodeURIComponent(dayFromQuery) : null}
           selectedTime={timeFromQuery ? decodeURIComponent(timeFromQuery) : null}
@@ -222,4 +191,3 @@ export default function FilmPage() {
     </Suspense>
   );
 }
-

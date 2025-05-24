@@ -19,7 +19,6 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
   const [selectedSeatsForPurchase, setSelectedSeatsForPurchase] = useState<CellData[]>([]);
   const { toast } = useToast();
 
-  // Reactive list of stored layout names
   const [ctxStoredLayoutNames, setCtxStoredLayoutNames] = useState<string[]>([]);
 
   const refreshStoredLayoutNames = useCallback(() => {
@@ -27,13 +26,18 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       setCtxStoredLayoutNames([]);
       return;
     }
-    const indexJson = localStorage.getItem(LOCAL_STORAGE_INDEX_KEY);
-    const names = indexJson ? JSON.parse(indexJson) : [];
-    setCtxStoredLayoutNames(names);
+    try {
+      const indexJson = localStorage.getItem(LOCAL_STORAGE_INDEX_KEY);
+      const names = indexJson ? JSON.parse(indexJson) : [];
+      setCtxStoredLayoutNames(Array.isArray(names) ? names : []);
+    } catch (e) {
+      console.error("Failed to parse stored layout names from localStorage:", e);
+      setCtxStoredLayoutNames([]);
+    }
   }, []);
 
   useEffect(() => {
-    refreshStoredLayoutNames(); // Initial load of stored names
+    refreshStoredLayoutNames();
   }, [refreshStoredLayoutNames]);
 
   const initializeLayout = useCallback((rows: number, cols: number, name?: string) => {
@@ -43,7 +47,9 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    initializeLayout(DEFAULT_ROWS, DEFAULT_COLS);
+    // Initialize with default layout only if no specific layout is intended to be loaded by consuming components.
+    // This prevents overwriting a layout that might be loaded immediately by a page based on URL params.
+    // A component like FilmPage will call loadLayout/loadLayoutFromStorage in its own useEffect.
   }, [initializeLayout]);
 
   const updateCell = useCallback((row: number, col: number) => {
@@ -116,22 +122,23 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       }
       const processedLayout = {
         ...newLayoutData,
-        name: newLayoutData.name || 'Untitled Hall', // Ensure name exists
+        name: newLayoutData.name || 'Untitled Hall', 
         grid: newLayoutData.grid.map(row => row.map(cell => {
-          if (cell.type === 'seat' && !cell.status) { 
-            return { ...cell, status: 'available' as SeatStatus };
+          const newCell = {...cell}; // Create a new cell object
+          if (newCell.type === 'seat' && !newCell.status) { 
+            newCell.status = 'available' as SeatStatus;
           }
-          return cell;
+          return newCell;
         }))
       };
       setLayout(processedLayout);
-      clearSeatSelection();
+      setSelectedSeatsForPurchase([]); // Clear selection when a new layout is loaded
       toast({ title: "Success", description: `Layout "${processedLayout.name}" loaded.` });
     } catch (error) {
       console.error("Failed to load layout:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to load layout file. Ensure it's a valid JSON." });
+      toast({ variant: "destructive", title: "Error", description: "Failed to load layout. Ensure it's a valid JSON or file format." });
     }
-  }, [toast, clearSeatSelection]);
+  }, [toast]); // Removed clearSeatSelection from dependencies as it's called internally
 
   const exportLayout = () => {
     const layoutToExport = { ...layout };
@@ -156,11 +163,16 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Success", description: `Layout "${layoutToExport.name}" exported.` });
   };
 
-  // This is now a direct localStorage reader, not for reactive UI updates primarily
   const getStoredLayoutNames = useCallback((): string[] => {
     if (typeof window === 'undefined') return [];
-    const indexJson = localStorage.getItem(LOCAL_STORAGE_INDEX_KEY);
-    return indexJson ? JSON.parse(indexJson) : [];
+    try {
+      const indexJson = localStorage.getItem(LOCAL_STORAGE_INDEX_KEY);
+      const names = indexJson ? JSON.parse(indexJson) : [];
+      return Array.isArray(names) ? names : [];
+    } catch (e) {
+      console.error("Failed to parse stored layout names from localStorage during get:", e);
+      return [];
+    }
   }, []);
 
   const saveLayoutToStorage = useCallback((saveName: string): boolean => {
@@ -169,7 +181,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "Error", description: "Layout name cannot be empty." });
       return false;
     }
-    const currentStoredNames = getStoredLayoutNames(); // Use direct getter for check
+    const currentStoredNames = getStoredLayoutNames(); 
     if (currentStoredNames.includes(saveName) && !confirm(`Layout "${saveName}" already exists. Overwrite?`)) {
       return false;
     }
@@ -183,15 +195,20 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
         return restOfCell;
     }));
 
-    localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + saveName, JSON.stringify(layoutToSave));
-    
-    if (!currentStoredNames.includes(saveName)) {
-      localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify([...currentStoredNames, saveName]));
+    try {
+      localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + saveName, JSON.stringify(layoutToSave));
+      if (!currentStoredNames.includes(saveName)) {
+        localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify([...currentStoredNames, saveName]));
+      }
+      setLayout(prev => ({...prev, name: saveName})); // Update current layout name in context
+      refreshStoredLayoutNames(); 
+      toast({ title: "Success", description: `Layout "${saveName}" saved to browser.` });
+      return true;
+    } catch (e) {
+      console.error("Failed to save layout to localStorage:", e);
+      toast({ variant: "destructive", title: "Error", description: "Could not save layout to browser storage." });
+      return false;
     }
-    setLayout(prev => ({...prev, name: saveName}));
-    refreshStoredLayoutNames(); // Update reactive list in context
-    toast({ title: "Success", description: `Layout "${saveName}" saved to browser.` });
-    return true;
   }, [layout, toast, refreshStoredLayoutNames, getStoredLayoutNames]);
 
   const loadLayoutFromStorage = useCallback((layoutName: string) => {
@@ -211,11 +228,16 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
   
   const deleteStoredLayout = useCallback((layoutName: string) => {
     if (typeof window === 'undefined') return;
-    localStorage.removeItem(LOCAL_STORAGE_LAYOUT_PREFIX + layoutName);
-    const currentStoredNames = getStoredLayoutNames(); // Use direct getter
-    localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(currentStoredNames.filter(name => name !== layoutName)));
-    refreshStoredLayoutNames(); // Update reactive list in context
-    toast({ title: "Success", description: `Layout "${layoutName}" deleted from browser.` });
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_LAYOUT_PREFIX + layoutName);
+      const currentStoredNames = getStoredLayoutNames(); 
+      localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(currentStoredNames.filter(name => name !== layoutName)));
+      refreshStoredLayoutNames(); 
+      toast({ title: "Success", description: `Layout "${layoutName}" deleted from browser.` });
+    } catch (e) {
+      console.error("Failed to delete layout from localStorage:", e);
+      toast({ variant: "destructive", title: "Error", description: "Could not delete layout from browser storage." });
+    }
   }, [toast, refreshStoredLayoutNames, getStoredLayoutNames]);
 
   const toggleSeatSelection = useCallback((rowIndex: number, colIndex: number) => {
@@ -246,8 +268,9 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       }));
       return { ...prevLayout, grid: newGrid };
     });
+    const seatCount = selectedSeatsForPurchase.length;
     setSelectedSeatsForPurchase([]);
-    toast({ title: "Purchase Confirmed!", description: "Your selected seats are now booked." });
+    toast({ title: "Purchase Confirmed!", description: `${seatCount} seat(s) are now booked.` });
   }, [selectedSeatsForPurchase, toast]);
 
 
@@ -260,8 +283,8 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       initializeLayout, updateCell,
       loadLayout, exportLayout,
       saveLayoutToStorage, loadLayoutFromStorage, deleteStoredLayout, getStoredLayoutNames,
-      storedLayoutNames: ctxStoredLayoutNames, // Provide reactive list
-      refreshStoredLayoutNames, // Provide refresher function
+      storedLayoutNames: ctxStoredLayoutNames, 
+      refreshStoredLayoutNames, 
       selectedSeatsForPurchase, toggleSeatSelection, confirmTicketPurchase, clearSeatSelection
     }}>
       {children}
