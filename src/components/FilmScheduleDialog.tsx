@@ -27,15 +27,16 @@ export const FilmScheduleDialog: React.FC<FilmScheduleDialogProps> = ({ film, ch
   const [dialogOpen, setDialogOpen] = useState(false);
   const { storedLayoutNames } = useLayoutContext();
 
-  const allValidHallNames = useMemo(() => {
-    const sampleHallNames = sampleLayouts.map(l => l.name);
-    return new Set([...sampleHallNames, ...storedLayoutNames]);
-  }, [sampleLayouts, storedLayoutNames]);
-
   const groupedSchedule = useMemo(() => {
     if (!film.schedule) return {};
+
+    // Calculate allValidHallNames directly inside this useMemo
+    // to ensure it uses the latest storedLayoutNames from the current render cycle.
+    const currentSampleHallNames = sampleLayouts.map(l => l.name);
+    const currentAllValidHallNames = new Set([...currentSampleHallNames, ...storedLayoutNames]);
+
     return film.schedule.reduce((acc, entry) => {
-      if (!allValidHallNames.has(entry.hallName)) { // Pre-filter entries if hall is not valid
+      if (!currentAllValidHallNames.has(entry.hallName)) { 
         return acc;
       }
       if (!acc[entry.day]) {
@@ -44,7 +45,7 @@ export const FilmScheduleDialog: React.FC<FilmScheduleDialogProps> = ({ film, ch
       acc[entry.day].push(entry);
       return acc;
     }, {} as Record<string, ScheduleEntry[]>);
-  }, [film.schedule, allValidHallNames]);
+  }, [film.schedule, storedLayoutNames, sampleLayouts]); // Dependencies: film's schedule, stored names from context, and static sample layouts
 
   const hasAnyValidShowtimes = useMemo(() => {
     return Object.values(groupedSchedule).some(entries => entries.length > 0);
@@ -63,7 +64,7 @@ export const FilmScheduleDialog: React.FC<FilmScheduleDialogProps> = ({ film, ch
         <div className="mt-4 grid gap-6 py-4 max-h-[60vh] overflow-y-auto">
           {hasAnyValidShowtimes ? (
             Object.entries(groupedSchedule).map(([day, entries]) => {
-              if (entries.length === 0) return null; // Skip day if no valid entries after initial grouping filter
+              if (entries.length === 0) return null;
 
               return (
                 <div key={day}>
@@ -75,9 +76,9 @@ export const FilmScheduleDialog: React.FC<FilmScheduleDialogProps> = ({ film, ch
                       <li key={idx}>
                         <Button
                           variant="ghost"
-                          className="w-full justify-start h-auto p-3 hover:bg-muted/80 transition-colors group" // Added group for Ticket icon hover
+                          className="w-full justify-start h-auto p-3 hover:bg-muted/80 transition-colors group"
                           asChild
-                          onClick={() => setDialogOpen(false)} // Close dialog on click
+                          onClick={() => setDialogOpen(false)} 
                         >
                           <Link href={`/film/${film.id}?hall=${encodeURIComponent(entry.hallName)}&day=${encodeURIComponent(entry.day)}&time=${encodeURIComponent(entry.time)}`} >
                             <div className="flex items-center text-sm w-full">
