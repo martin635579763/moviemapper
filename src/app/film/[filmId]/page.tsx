@@ -6,7 +6,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { LayoutProvider, useLayoutContext } from '@/contexts/LayoutContext';
 import { LayoutPreview } from '@/components/LayoutPreview';
-import { sampleFilms, type Film } from '@/data/films';
+import { getSampleFilmsWithDynamicSchedules, type Film } from '@/data/films'; // Updated import
 import { sampleLayouts } from '@/data/sample-layouts';
 import type { HallLayout } from '@/types/layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,14 +16,14 @@ import { ArrowLeft, CalendarDays, Clock, Ticket as TicketIconLucide, Info } from
 
 interface FilmTicketBookingInterfaceProps {
   film: Film;
-  initialLayout: HallLayout | undefined; // Can be undefined if hallNameFromQuery is for a stored layout
+  initialLayout: HallLayout | undefined; 
   initialHallNameOverride: string | null;
   selectedDay: string | null;
   selectedTime: string | null;
 }
 
 const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({ film, initialLayout, initialHallNameOverride, selectedDay, selectedTime }) => {
-  const { layout, loadLayout, loadLayoutFromStorage, clearSeatSelection } = useLayoutContext();
+  const { layout, loadLayout, loadLayoutFromStorage } = useLayoutContext();
   
   useEffect(() => {
     if (initialHallNameOverride) {
@@ -34,11 +34,9 @@ const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({
         loadLayoutFromStorage(initialHallNameOverride);
       }
     } else if (initialLayout) {
-       loadLayout(JSON.parse(JSON.stringify(initialLayout))); // Deep copy
+       loadLayout(JSON.parse(JSON.stringify(initialLayout))); 
     }
-    // clearSeatSelection was removed from context, ensure it's not called if re-added without full logic.
-    // if (typeof clearSeatSelection === 'function') clearSeatSelection(); 
-  }, [initialLayout, initialHallNameOverride, loadLayout, loadLayoutFromStorage, sampleLayouts]); // Added sampleLayouts
+  }, [initialLayout, initialHallNameOverride, loadLayout, loadLayoutFromStorage, sampleLayouts]);
 
   return (
     <div className="flex flex-col xl:flex-row gap-6 p-4 md:p-6 max-w-screen-2xl mx-auto">
@@ -108,46 +106,68 @@ function FilmPageContent() {
   const hallNameFromQuery = searchParams.get('hall');
   const dayFromQuery = searchParams.get('day');
   const timeFromQuery = searchParams.get('time');
+
+  // Use state to hold films to ensure client-side execution for localStorage access
+  const [allFilms, setAllFilms] = useState<Film[]>([]);
+  useEffect(() => {
+    setAllFilms(getSampleFilmsWithDynamicSchedules());
+  }, []);
   
   const filmData = useMemo(() => {
-    if (!filmId) return { film: undefined, layoutToLoad: undefined, initialHallNameOverride: null };
-    const currentFilm = sampleFilms.find(f => f.id === filmId);
+    if (!filmId || allFilms.length === 0) return { film: undefined, layoutToLoad: undefined, initialHallNameOverride: null };
+    
+    const currentFilm = allFilms.find(f => f.id === filmId);
     if (!currentFilm) return { film: undefined, layoutToLoad: undefined, initialHallNameOverride: null };
     
     let layoutToLoad: HallLayout | undefined = undefined;
     let initialHallNameOverrideForInterface: string | null = hallNameFromQuery ? decodeURIComponent(hallNameFromQuery) : null;
 
     if (initialHallNameOverrideForInterface) {
+      // Try to find in samples first
       layoutToLoad = sampleLayouts.find(l => l.name === initialHallNameOverrideForInterface);
+      // If not a sample, initialHallNameOverrideForInterface will be used by FilmTicketBookingInterface to load from storage
     }
 
-    if (!layoutToLoad && currentFilm.associatedLayoutName) {
+    // If no hall from query, or if query hall was a sample (already set to layoutToLoad)
+    // or if query hall was not a sample (initialHallNameOverrideForInterface is set, layoutToLoad is undefined, which is fine)
+    // then, check for associated layout if no specific hall was effectively chosen for direct load.
+    if (!layoutToLoad && !initialHallNameOverrideForInterface && currentFilm.associatedLayoutName) {
       layoutToLoad = sampleLayouts.find(l => l.name === currentFilm.associatedLayoutName);
     }
 
+    // Fallback to first sample layout if no specific hall from query and no associated layout
     if (!layoutToLoad && !initialHallNameOverrideForInterface) { 
-      layoutToLoad = sampleLayouts[0];
+      layoutToLoad = sampleLayouts.length > 0 ? sampleLayouts[0] : undefined;
     }
     
     return { 
       film: currentFilm, 
       layoutToLoad: layoutToLoad, 
-      initialHallNameOverride: initialHallNameOverrideForInterface 
+      initialHallNameOverride: layoutToLoad ? null : initialHallNameOverrideForInterface // Pass override only if not found in samples
     };
-  }, [filmId, hallNameFromQuery, sampleFilms, sampleLayouts]); // Added sampleFilms and sampleLayouts
+  }, [filmId, hallNameFromQuery, allFilms, sampleLayouts]); 
 
   const { film, layoutToLoad, initialHallNameOverride } = filmData;
 
   if (!filmId) {
     return <div className="text-center py-20 text-xl text-destructive-foreground">Film ID is missing.</div>;
   }
+  
+  if (allFilms.length === 0) { // Still fetching films
+     return (
+        <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-4">
+            <TicketIconLucide className="w-16 h-16 text-primary mb-4 animate-bounce" />
+            <h1 className="text-2xl font-semibold mb-2">Loading Film Data...</h1>
+        </div>
+    );
+  }
 
   if (!film) { 
     return (
         <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-4">
             <TicketIconLucide className="w-16 h-16 text-primary mb-4 animate-pulse" />
-            <h1 className="text-2xl font-semibold mb-2">Loading Film Details...</h1>
-            <p className="text-muted-foreground mb-6">Or, this film might not exist.</p>
+            <h1 className="text-2xl font-semibold mb-2">Film Not Found</h1>
+            <p className="text-muted-foreground mb-6">The film you are looking for does not exist or the schedule is being updated.</p>
             <Button asChild variant="outline">
                 <Link href="/">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Films
@@ -157,9 +177,6 @@ function FilmPageContent() {
     );
   }
   
-  // If initialHallNameOverride is present and not a sample, layoutToLoad will be undefined.
-  // FilmTicketBookingInterface will then use initialHallNameOverride to load from storage.
-  // If initialHallNameOverride is null, layoutToLoad will be either the associated sample or the default sample.
   const finalInitialLayoutProp = layoutToLoad;
 
   return (
@@ -191,3 +208,4 @@ export default function FilmPage() {
     </Suspense>
   );
 }
+

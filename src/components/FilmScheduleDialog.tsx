@@ -15,8 +15,7 @@ import {
 import type { Film, ScheduleEntry } from '@/data/films';
 import { Clock, Building, CalendarDays, Ticket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useLayoutContext } from '@/contexts/LayoutContext';
-import { sampleLayouts } from '@/data/sample-layouts';
+// No longer need useLayoutContext or sampleLayouts here as schedule comes pre-filtered
 
 interface FilmScheduleDialogProps {
   film: Film;
@@ -25,27 +24,20 @@ interface FilmScheduleDialogProps {
 
 export const FilmScheduleDialog: React.FC<FilmScheduleDialogProps> = ({ film, children }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { storedLayoutNames } = useLayoutContext();
 
+  // The film.schedule is now dynamically generated to only include available halls.
+  // So, we just need to group it.
   const groupedSchedule = useMemo(() => {
-    if (!film.schedule) return {};
-
-    // Calculate allValidHallNames directly inside this useMemo
-    // to ensure it uses the latest storedLayoutNames from the current render cycle.
-    const currentSampleHallNames = sampleLayouts.map(l => l.name);
-    const currentAllValidHallNames = new Set([...currentSampleHallNames, ...storedLayoutNames]);
+    if (!film.schedule || film.schedule.length === 0) return {};
 
     return film.schedule.reduce((acc, entry) => {
-      if (!currentAllValidHallNames.has(entry.hallName)) { 
-        return acc;
-      }
       if (!acc[entry.day]) {
         acc[entry.day] = [];
       }
       acc[entry.day].push(entry);
       return acc;
     }, {} as Record<string, ScheduleEntry[]>);
-  }, [film.schedule, storedLayoutNames, sampleLayouts]); // Dependencies: film's schedule, stored names from context, and static sample layouts
+  }, [film.schedule]); // Depends only on the film's schedule
 
   const hasAnyValidShowtimes = useMemo(() => {
     return Object.values(groupedSchedule).some(entries => entries.length > 0);
@@ -58,13 +50,13 @@ export const FilmScheduleDialog: React.FC<FilmScheduleDialogProps> = ({ film, ch
         <DialogHeader>
           <DialogTitle className="text-2xl">{film.title} - Schedule</DialogTitle>
           <DialogDescription>
-            Select a showtime and hall to proceed to ticket booking. Only showtimes in available halls are listed.
+            Select a showtime and hall to proceed to ticket booking. Schedules are based on currently available halls.
           </DialogDescription>
         </DialogHeader>
         <div className="mt-4 grid gap-6 py-4 max-h-[60vh] overflow-y-auto">
           {hasAnyValidShowtimes ? (
             Object.entries(groupedSchedule).map(([day, entries]) => {
-              if (entries.length === 0) return null;
+              if (entries.length === 0) return null; // Should not happen if schedule is pre-filtered
 
               return (
                 <div key={day}>
@@ -99,7 +91,7 @@ export const FilmScheduleDialog: React.FC<FilmScheduleDialogProps> = ({ film, ch
             })
           ) : (
             <p className="text-muted-foreground text-center py-4">
-              No schedule currently available for this film in known halls. Please check back later.
+              No schedule currently available for this film based on known halls. Please check back later or ensure halls are configured.
             </p>
           )}
         </div>

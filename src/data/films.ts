@@ -1,4 +1,7 @@
 
+import type { HallLayout } from '@/types/layout'; // Keep for potential future use if needed
+import { sampleLayouts as staticSampleLayouts } from './sample-layouts';
+
 export interface ScheduleEntry {
   day: string;
   time: string;
@@ -6,12 +9,12 @@ export interface ScheduleEntry {
 }
 
 export interface Film {
-  id:string;
+  id: string;
   title: string;
   description: string;
   posterUrl: string;
   detailImageUrls: string[];
-  associatedLayoutName: string; // This is the default layout if no specific hall is chosen from schedule
+  associatedLayoutName: string;
   duration: string;
   genre: string;
   schedule?: ScheduleEntry[];
@@ -23,8 +26,7 @@ const getDetailImageUnsplashUrl = (keywords: string, width: number = 600, height
   return `https://source.unsplash.com/${width}x${height}/?${relevantKeywords},scene`;
 };
 
-
-export const sampleFilms: Film[] = [
+const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
   {
     id: '1',
     title: 'Adventure in the Cosmos',
@@ -35,18 +37,9 @@ export const sampleFilms: Film[] = [
       getDetailImageUnsplashUrl('spaceship,cockpit', 600, 400),
       getDetailImageUnsplashUrl('alien,planet', 600, 400),
     ],
-    associatedLayoutName: 'Standard Cinema', // Default if no schedule choice
+    associatedLayoutName: 'Standard Cinema',
     duration: "2h 30m",
     genre: "Sci-Fi, Adventure",
-    schedule: [
-      { day: "Today", time: "2:00 PM", hallName: "hall one" },
-      { day: "Today", time: "5:00 PM", hallName: "hall two" },
-      { day: "Today", time: "7:30 PM", hallName: "hall 3" }, // Added hall 3
-      { day: "Today", time: "8:00 PM", hallName: "hall one" },
-      { day: "Tomorrow", time: "3:00 PM", hallName: "hall two" },
-      { day: "Tomorrow", time: "6:00 PM", hallName: "hall one" },
-      { day: "Tomorrow", time: "8:30 PM", hallName: "hall 3" }, // Added hall 3
-    ]
   },
   {
     id: '5',
@@ -57,15 +50,9 @@ export const sampleFilms: Film[] = [
       getDetailImageUnsplashUrl('ancient ruins,desert', 600, 400),
       getDetailImageUnsplashUrl('old map,treasure', 600, 400),
     ],
-    associatedLayoutName: 'Small Hall', // Default if no schedule choice
+    associatedLayoutName: 'Small Hall',
     duration: "2h 00m",
     genre: "Adventure, Mystery",
-    schedule: [
-      { day: "Today", time: "1:00 PM", hallName: "hall two" },
-      { day: "Today", time: "4:00 PM", hallName: "hall one" },
-      { day: "Tomorrow", time: "2:00 PM", hallName: "hall two" },
-      { day: "Tomorrow", time: "5:00 PM", hallName: "hall 3" }, // Added hall 3
-    ]
   },
   {
     id: '3',
@@ -77,15 +64,9 @@ export const sampleFilms: Film[] = [
       getDetailImageUnsplashUrl('luxury,theater', 600, 400),
       getDetailImageUnsplashUrl('movie,premiere', 600, 400),
     ],
-    associatedLayoutName: 'Special VIP Hall', // Default if no schedule choice
+    associatedLayoutName: 'Special VIP Hall',
     duration: "2h 10m",
     genre: "Drama, Romance",
-    schedule: [
-      { day: "Today", time: "7:00 PM", hallName: "hall one" }, 
-      { day: "Tomorrow", time: "7:00 PM", hallName: "hall one" },
-      { day: "Friday", time: "8:00 PM", hallName: "hall two" }, 
-      { day: "Friday", time: "9:00 PM", hallName: "Special VIP Hall" },
-    ]
   },
   {
     id: '4',
@@ -97,14 +78,66 @@ export const sampleFilms: Film[] = [
       getDetailImageUnsplashUrl('heroic,battle', 600, 400),
       getDetailImageUnsplashUrl('soldiers,action', 600, 400),
     ],
-    associatedLayoutName: 'Standard Cinema', // Default if no schedule choice
+    associatedLayoutName: 'Standard Cinema',
     duration: "2h 05m",
     genre: "Action, War",
-    schedule: [
-      { day: "Today", time: "12:00 PM", hallName: "hall two" },
-      { day: "Today", time: "3:30 PM", hallName: "hall one" },
-      { day: "Today", time: "9:00 PM", hallName: "hall two" },
-      { day: "Tomorrow", time: "1:00 PM", hallName: "hall one" },
-    ]
   }
 ];
+
+const POSSIBLE_TIMES_FOR_GENERATION = ["2:30 PM", "5:15 PM", "7:45 PM", "9:00 PM"];
+const DAYS_FOR_GENERATION = ["Today", "Tomorrow"];
+const LOCAL_STORAGE_INDEX_KEY_FOR_FILMS = 'seatLayout_index_v1'; // Must match LayoutContext
+
+export function getSampleFilmsWithDynamicSchedules(): Film[] {
+  let storedLayoutNames: string[] = [];
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const indexJson = localStorage.getItem(LOCAL_STORAGE_INDEX_KEY_FOR_FILMS);
+      const names = indexJson ? JSON.parse(indexJson) : [];
+      if (Array.isArray(names)) {
+        storedLayoutNames = names.filter(name => typeof name === 'string');
+      }
+    } catch (e) {
+      console.error("Error reading stored layout names in films.ts:", e);
+    }
+  }
+
+  const sampleLayoutNames = staticSampleLayouts.map(l => l.name);
+  const allAvailableHallNames = Array.from(new Set([...sampleLayoutNames, ...storedLayoutNames]));
+
+  return BASE_FILM_DATA.map(baseFilm => {
+    const dynamicSchedule: ScheduleEntry[] = [];
+    if (allAvailableHallNames.length > 0) {
+      DAYS_FOR_GENERATION.forEach(day => {
+        // Assign 1 to 3 showtimes per day for this film, spread across available halls
+        const numShowtimesToday = Math.floor(Math.random() * Math.min(3, allAvailableHallNames.length)) + 1;
+        
+        // Shuffle halls to pick from for variety
+        const shuffledHalls = [...allAvailableHallNames].sort(() => 0.5 - Math.random());
+
+        for (let i = 0; i < numShowtimesToday; i++) {
+          if (i >= shuffledHalls.length) break; // Not enough halls for desired showtimes
+          
+          const hallName = shuffledHalls[i];
+          const randomTimeIndex = Math.floor(Math.random() * POSSIBLE_TIMES_FOR_GENERATION.length);
+          const time = POSSIBLE_TIMES_FOR_GENERATION[randomTimeIndex];
+          
+          // Avoid duplicate day/time/hall entries for the same film if logic somehow creates them
+          if (!dynamicSchedule.some(e => e.day === day && e.time === time && e.hallName === hallName)) {
+            dynamicSchedule.push({ day, time, hallName });
+          }
+        }
+      });
+    }
+    // Sort schedule for consistency
+    dynamicSchedule.sort((a, b) => {
+      if (a.day !== b.day) return DAYS_FOR_GENERATION.indexOf(a.day) - DAYS_FOR_GENERATION.indexOf(b.day);
+      return POSSIBLE_TIMES_FOR_GENERATION.indexOf(a.time) - POSSIBLE_TIMES_FOR_GENERATION.indexOf(b.time);
+    });
+    
+    return {
+      ...baseFilm,
+      schedule: dynamicSchedule,
+    };
+  });
+}
