@@ -6,17 +6,12 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  allowedDevOrigins: ["https://8002-firebase-studio-1747892384797.cluster-zumahodzirciuujpqvsniawo3o.cloudworkstations.dev"],
   eslint: {
     ignoreDuringBuilds: true,
   },
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
-      },
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
@@ -25,16 +20,22 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'source.unsplash.com',
+        hostname: 'source.unsplash.com', // Added this entry
         port: '',
         pathname: '/**',
       },
       {
         protocol: 'https',
-        hostname: 'images.pexels.com', // Added Pexels
+        hostname: 'images.pexels.com', 
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https', // Added for placehold.co as it's used in GridCell
+        hostname: 'placehold.co',
+        port: '',
+        pathname: '/**',
+      }
     ],
   },
 };
