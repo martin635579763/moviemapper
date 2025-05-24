@@ -19,9 +19,8 @@ export interface Film {
 
 // Helper to generate consistent Unsplash URLs for detail images
 const getDetailImageUnsplashUrl = (keywords: string, width: number = 600, height: number = 400): string => {
-  // Simplified keywords for Unsplash
   const relevantKeywords = keywords.split(',').map(k => k.trim().toLowerCase().replace(/\s+/g, '-')).slice(0,2).join(',');
-  return `https://source.unsplash.com/${width}x${height}/?${relevantKeywords},movie,scene`;
+  return `https://source.unsplash.com/${width}x${height}/?${relevantKeywords},scene`;
 };
 
 
@@ -42,9 +41,11 @@ export const sampleFilms: Film[] = [
     schedule: [
       { day: "Today", time: "2:00 PM", hallName: "hall one" },
       { day: "Today", time: "5:00 PM", hallName: "hall two" },
+      { day: "Today", time: "7:30 PM", hallName: "hall 3" }, // Added hall 3
       { day: "Today", time: "8:00 PM", hallName: "hall one" },
       { day: "Tomorrow", time: "3:00 PM", hallName: "hall two" },
       { day: "Tomorrow", time: "6:00 PM", hallName: "hall one" },
+      { day: "Tomorrow", time: "8:30 PM", hallName: "hall 3" }, // Added hall 3
     ]
   },
   {
@@ -63,6 +64,7 @@ export const sampleFilms: Film[] = [
       { day: "Today", time: "1:00 PM", hallName: "hall two" },
       { day: "Today", time: "4:00 PM", hallName: "hall one" },
       { day: "Tomorrow", time: "2:00 PM", hallName: "hall two" },
+      { day: "Tomorrow", time: "5:00 PM", hallName: "hall 3" }, // Added hall 3
     ]
   },
   {
@@ -79,9 +81,10 @@ export const sampleFilms: Film[] = [
     duration: "2h 10m",
     genre: "Drama, Romance",
     schedule: [
-      { day: "Today", time: "7:00 PM", hallName: "hall one" }, // Assuming "hall one" could be your VIP hall
+      { day: "Today", time: "7:00 PM", hallName: "hall one" }, 
       { day: "Tomorrow", time: "7:00 PM", hallName: "hall one" },
-      { day: "Friday", time: "8:00 PM", hallName: "hall two" }, // Or "hall two" if that's VIP
+      { day: "Friday", time: "8:00 PM", hallName: "hall two" }, 
+      { day: "Friday", time: "9:00 PM", hallName: "Special VIP Hall" },
     ]
   },
   {
