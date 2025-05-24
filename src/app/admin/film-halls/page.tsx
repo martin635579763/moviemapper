@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input'; // Added
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { ShieldAlert, ListVideo, Save, CalendarDays, Clock, Building2, Trash2, PlusCircle, RotateCcw } from 'lucide-react';
@@ -31,63 +31,74 @@ const FilmHallConfigPage: NextPage = () => {
   const [allFilmsData, setAllFilmsData] = useState<Film[]>([]);
   const [selectedFilmId, setSelectedFilmId] = useState<string | null>(null);
   
-  // For Hall Preferences
   const [currentFilmHallPreferences, setCurrentFilmHallPreferences] = useState<string[]>([]);
   const [allHallPreferences, setAllHallPreferences] = useState<FilmHallPreferences>({});
 
-  // For Editable Schedule
   const [editableSchedule, setEditableSchedule] = useState<ScheduleEntry[]>([]);
   const [newShowtimeDay, setNewShowtimeDay] = useState<string>(DAYS_FOR_GENERATION[0]);
   const [newShowtimeTime, setNewShowtimeTime] = useState<string>(POSSIBLE_TIMES_FOR_GENERATION[0]);
   const [newShowtimeHall, setNewShowtimeHall] = useState<string>("");
 
-  const fetchAllFilmsDataWithSchedules = useCallback(() => {
-    const filmsWithSchedules = getSampleFilmsWithDynamicSchedules();
-    setAllFilmsData(filmsWithSchedules);
-    return filmsWithSchedules;
-  }, []);
-
+  // Effect for manager check
   useEffect(() => {
     if (!isManager) {
       router.replace('/');
     }
   }, [isManager, router]);
   
+  // Effect for initial data loading and when isManager status changes
   useEffect(() => {
-    refreshStoredLayoutNames();
-    fetchAllFilmsDataWithSchedules();
+    if (isManager) {
+      refreshStoredLayoutNames(); // For context, to ensure storedLayoutNames is up-to-date
+      const films = getSampleFilmsWithDynamicSchedules();
+      setAllFilmsData(films);
 
-    if (typeof window !== 'undefined') {
-      try {
-        const hallPrefsJson = localStorage.getItem(LOCAL_STORAGE_FILM_HALL_PREFERENCES_KEY);
-        setAllHallPreferences(hallPrefsJson ? JSON.parse(hallPrefsJson) : {});
-      } catch (e) {
-        console.error("Error reading film hall preferences from localStorage:", e);
-        setAllHallPreferences({});
-      }
-    }
-    if (storedLayoutNames.length > 0) {
-      setNewShowtimeHall(storedLayoutNames[0]); // Default to first available hall
-    }
-  }, [isManager, refreshStoredLayoutNames, fetchAllFilmsDataWithSchedules, storedLayoutNames]);
-
-  useEffect(() => {
-    if (selectedFilmId) {
-      setCurrentFilmHallPreferences(allHallPreferences[selectedFilmId] || []);
-      const filmData = allFilmsData.find(f => f.id === selectedFilmId);
-      setEditableSchedule(filmData?.schedule || []);
-      if (storedLayoutNames.length > 0 && !newShowtimeHall) {
-        setNewShowtimeHall(storedLayoutNames[0]);
+      if (typeof window !== 'undefined') {
+        try {
+          const hallPrefsJson = localStorage.getItem(LOCAL_STORAGE_FILM_HALL_PREFERENCES_KEY);
+          setAllHallPreferences(hallPrefsJson ? JSON.parse(hallPrefsJson) : {});
+        } catch (e) {
+          console.error("Error reading film hall preferences from localStorage:", e);
+          setAllHallPreferences({});
+        }
       }
     } else {
+      setAllFilmsData([]); // Clear data if not manager
+      setAllHallPreferences({});
+    }
+  }, [isManager, refreshStoredLayoutNames]);
+
+  // Effect to update UI when a film is selected or related primary data changes
+  useEffect(() => {
+    if (selectedFilmId && allFilmsData.length > 0) {
+      setCurrentFilmHallPreferences(allHallPreferences[selectedFilmId] || []);
+      const filmData = allFilmsData.find(f => f.id === selectedFilmId);
+      // Use spread to ensure a new reference if filmData.schedule is complex, though usually it's already new
+      setEditableSchedule(filmData?.schedule ? [...filmData.schedule] : []);
+    } else if (!selectedFilmId) { // Handles deselection or initial state
       setCurrentFilmHallPreferences([]);
       setEditableSchedule([]);
     }
-  }, [selectedFilmId, allHallPreferences, allFilmsData, storedLayoutNames, newShowtimeHall]);
+  }, [selectedFilmId, allFilmsData, allHallPreferences]);
+
+  // Effect to manage the default for the "Add Showtime" hall input (newShowtimeHall)
+  // This primarily reacts to changes in available halls (storedLayoutNames)
+  useEffect(() => {
+    if (storedLayoutNames.length > 0) {
+      // If newShowtimeHall is currently empty OR not in the list of available halls,
+      // set it to the first available hall.
+      if (!newShowtimeHall || !storedLayoutNames.includes(newShowtimeHall)) {
+        setNewShowtimeHall(storedLayoutNames[0]);
+      }
+    } else {
+      // If no stored halls, clear newShowtimeHall.
+      setNewShowtimeHall("");
+    }
+  }, [storedLayoutNames]); // Only depends on storedLayoutNames changing
 
   const handleFilmSelect = (filmId: string) => {
     setSelectedFilmId(filmId);
-    // Reset new showtime hall when film changes, if not already set by a stored layout
+    // When a film is selected, always reset the 'new showtime' hall dropdown to the first available hall.
     if (storedLayoutNames.length > 0) {
       setNewShowtimeHall(storedLayoutNames[0]);
     } else {
@@ -115,12 +126,12 @@ const FilmHallConfigPage: NextPage = () => {
       localStorage.setItem(LOCAL_STORAGE_FILM_HALL_PREFERENCES_KEY, JSON.stringify(newAllPrefs));
       setAllHallPreferences(newAllPrefs); 
       
-      // Re-fetch films to update schedule display based on new preferences if no custom schedule exists
       const currentSchedules: UserDefinedFilmSchedules = JSON.parse(localStorage.getItem(USER_DEFINED_FILM_SCHEDULES_KEY) || '{}');
-      if (!currentSchedules[selectedFilmId]) {
-        const updatedFilms = fetchAllFilmsDataWithSchedules();
+      if (!currentSchedules[selectedFilmId]) { // Only refetch if no custom schedule exists
+        const updatedFilms = getSampleFilmsWithDynamicSchedules(); // Get fresh data
+        setAllFilmsData(updatedFilms); // Update all films data
         const updatedSelectedFilm = updatedFilms.find(f => f.id === selectedFilmId);
-        setEditableSchedule(updatedSelectedFilm?.schedule || []);
+        setEditableSchedule(updatedSelectedFilm?.schedule || []); // Update displayed schedule
       }
       toast({ title: "Preferences Saved", description: `Hall preferences for '${selectedFilm?.title}' updated.` });
     } catch (e) {
@@ -148,7 +159,6 @@ const FilmHallConfigPage: NextPage = () => {
       return;
     }
     const newEntry: ScheduleEntry = { day: newShowtimeDay, time: newShowtimeTime, hallName: newShowtimeHall };
-    // Check for duplicates
     if (editableSchedule.some(e => e.day === newEntry.day && e.time === newEntry.time && e.hallName === newEntry.hallName)) {
         toast({ title: "Duplicate", description: "This showtime already exists.", variant: "destructive" });
         return;
@@ -176,7 +186,6 @@ const FilmHallConfigPage: NextPage = () => {
       currentSchedules[selectedFilmId] = editableSchedule;
       localStorage.setItem(USER_DEFINED_FILM_SCHEDULES_KEY, JSON.stringify(currentSchedules));
       
-      // Update allFilmsData to reflect this saved schedule immediately
       setAllFilmsData(prevFilms => prevFilms.map(film => 
         film.id === selectedFilmId ? { ...film, schedule: [...editableSchedule] } : film
       ));
@@ -197,10 +206,10 @@ const FilmHallConfigPage: NextPage = () => {
       delete currentSchedules[selectedFilmId];
       localStorage.setItem(USER_DEFINED_FILM_SCHEDULES_KEY, JSON.stringify(currentSchedules));
       
-      // Re-fetch all films to get the default dynamically generated schedule
-      const updatedFilms = fetchAllFilmsDataWithSchedules();
+      const updatedFilms = getSampleFilmsWithDynamicSchedules(); // Get fresh data
+      setAllFilmsData(updatedFilms); // Update all films data
       const updatedSelectedFilm = updatedFilms.find(f => f.id === selectedFilmId);
-      setEditableSchedule(updatedSelectedFilm?.schedule || []); // Update editableSchedule to default
+      setEditableSchedule(updatedSelectedFilm?.schedule || []);
       
       toast({ title: "Schedule Restored", description: `Schedule for '${selectedFilm?.title}' restored to default.` });
     } catch (e) {
@@ -208,7 +217,6 @@ const FilmHallConfigPage: NextPage = () => {
       toast({ title: "Error", description: "Could not restore default schedule.", variant: "destructive" });
     }
   };
-
 
   if (!isManager) {
     return (
@@ -301,7 +309,6 @@ const FilmHallConfigPage: NextPage = () => {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0 space-y-4">
-                    {/* Add new showtime form */}
                     <div className="flex flex-col sm:flex-row gap-3 items-end p-4 border rounded-md bg-card">
                         <div className="flex-1 min-w-[120px]">
                             <Label htmlFor="new-day">Day</Label>
@@ -337,7 +344,6 @@ const FilmHallConfigPage: NextPage = () => {
                         </Button>
                     </div>
 
-                    {/* Display and manage editable schedule */}
                     <div className="mt-4">
                         {Object.keys(groupedEditableSchedule).length > 0 ? (
                             Object.entries(groupedEditableSchedule).map(([day, entries]) => (
@@ -347,7 +353,6 @@ const FilmHallConfigPage: NextPage = () => {
                                     </h4>
                                     <ul className="space-y-1.5 pl-1">
                                         {entries.map((entry, idx) => {
-                                            // Find the original index in editableSchedule for removal
                                             const originalIndex = editableSchedule.findIndex(
                                                 (e) => e.day === entry.day && e.time === entry.time && e.hallName === entry.hallName
                                             );
@@ -423,3 +428,5 @@ const FilmHallConfigPage: NextPage = () => {
 };
 
 export default FilmHallConfigPage;
+
+    
