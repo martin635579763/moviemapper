@@ -2,25 +2,23 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getSampleFilmsWithDynamicSchedules, type Film } from '@/data/films'; // Updated import
+import { getSampleFilmsWithDynamicSchedules, type Film } from '@/data/films';
 import { FilmCard } from '@/components/FilmCard';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { UserCog, Clapperboard } from 'lucide-react'; 
-import { LayoutProvider } from '@/contexts/LayoutContext'; // Added LayoutProvider
-
+import { UserCog, Clapperboard, LogIn, LogOut } from 'lucide-react'; 
+import { useAuthContext } from '@/contexts/AuthContext';
 
 export default function HomePage() {
   const [filmsToDisplay, setFilmsToDisplay] = useState<Film[]>([]);
+  const { isManager, loginManager, logoutManager } = useAuthContext();
 
   useEffect(() => {
-    // Call the function to get films with dynamic schedules on mount
     setFilmsToDisplay(getSampleFilmsWithDynamicSchedules());
   }, []);
 
 
   return (
-    <LayoutProvider> {/*Ensure LayoutProvider wraps content if FilmScheduleDialog needs it via FilmCard */}
       <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 text-foreground p-4 sm:p-6 md:p-8">
         <header className="mb-10 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3">
@@ -29,11 +27,24 @@ export default function HomePage() {
               Movie Funhouse!
             </h1>
           </div>
-          <Button asChild variant="outline" size="lg" className="shadow-md hover:shadow-lg transition-shadow">
-            <Link href="/editor">
-              <UserCog className="mr-2 h-5 w-5" /> Layout Editor
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {isManager ? (
+              <>
+                <Button asChild variant="outline" size="lg" className="shadow-md hover:shadow-lg transition-shadow">
+                  <Link href="/editor">
+                    <UserCog className="mr-2 h-5 w-5" /> Layout Editor
+                  </Link>
+                </Button>
+                <Button variant="ghost" size="lg" onClick={logoutManager} className="shadow-md hover:shadow-lg transition-shadow">
+                  <LogOut className="mr-2 h-5 w-5" /> Logout
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" size="lg" onClick={loginManager} className="shadow-md hover:shadow-lg transition-shadow">
+                <LogIn className="mr-2 h-5 w-5" /> Manager Login
+              </Button>
+            )}
+          </div>
         </header>
 
         {filmsToDisplay.length === 0 && (
@@ -59,6 +70,5 @@ export default function HomePage() {
           Powered by Firebase Studio & Your Imagination!
         </footer>
       </div>
-    </LayoutProvider>
   );
 }
