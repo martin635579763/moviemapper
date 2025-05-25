@@ -77,10 +77,10 @@ export const AppToolbar: React.FC = () => {
 
   // Fetch film schedules when popover is open or storedLayoutNames change
   useEffect(() => {
-    if (isManagePopoverOpen) {
+    if (isManagePopoverOpen && refreshStoredLayoutNames) { // ensure refreshStoredLayoutNames is available
         setFilmsWithSchedules(getSampleFilmsWithDynamicSchedules());
     }
-  }, [isManagePopoverOpen, storedLayoutNames]);
+  }, [isManagePopoverOpen, storedLayoutNames, refreshStoredLayoutNames]);
 
   const isHallInUse = useCallback((hallName: string): boolean => {
     return filmsWithSchedules.some(film =>
@@ -116,8 +116,10 @@ export const AppToolbar: React.FC = () => {
   };
 
   const handleSaveToStorage = () => {
-    if (saveLayoutToStorage(saveLayoutNameInput)) {
-      // refreshStoredLayoutNames(); // Context handles refreshing its internal list
+    // Trim the name here as well, before passing to the context function
+    const trimmedSaveName = saveLayoutNameInput.trim();
+    if (saveLayoutToStorage(trimmedSaveName) && refreshStoredLayoutNames) {
+      // refreshStoredLayoutNames(); // Context handles refreshing its internal list via saveLayoutToStorage
     }
   };
 
@@ -222,6 +224,7 @@ export const AppToolbar: React.FC = () => {
              <Select onValueChange={(value) => {
                 if (value === "__manage__") return;
                 loadLayoutFromStorage(value);
+                // clearSeatSelection(); // This was removed as part of ticket selling feature rollback
               }}>
               <SelectTrigger className="w-[160px] h-9 text-xs">
                 <SelectValue placeholder="Load from Browser" />
@@ -246,6 +249,7 @@ export const AppToolbar: React.FC = () => {
             const selectedSample = sampleLayouts.find(sl => sl.name === value);
             if (selectedSample) {
               loadLayout(JSON.parse(JSON.stringify(selectedSample)));
+              // clearSeatSelection(); // This was removed as part of ticket selling feature rollback
             }
           }}>
           <SelectTrigger className="w-[150px] h-9 text-xs">
@@ -292,7 +296,7 @@ export const AppToolbar: React.FC = () => {
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="h-9 text-xs mt-2 ml-3">Manage Saved</Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0">
+          <PopoverContent className="w-auto p-0 min-w-[300px]">
               <Command>
                 <CommandInput placeholder="Filter layouts..." className="h-9"/>
                 <CommandList>
@@ -315,7 +319,7 @@ export const AppToolbar: React.FC = () => {
                               size="sm"
                               className="text-primary hover:bg-primary/10 h-7 px-2"
                               onClick={(e) => {
-                                e.stopPropagation();
+                                e.stopPropagation(); // Prevent CommandItem onSelect if it has one
                                 loadLayoutFromStorage(name);
                                 setIsManagePopoverOpen(false);
                               }}
@@ -328,7 +332,7 @@ export const AppToolbar: React.FC = () => {
                               size="sm"
                               className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
                               onClick={(e) => {
-                                  e.stopPropagation();
+                                  e.stopPropagation(); // Prevent CommandItem onSelect if it has one
                                   setLayoutToDelete(name);
                               }}
                               disabled={isHallInUse(name)}
@@ -362,11 +366,16 @@ export const AppToolbar: React.FC = () => {
   );
 };
 
-// ShadCN Command components
+// ShadCN Command components (local copy for simplicity in AppToolbar)
 const Command: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, ...props }) => (
   <div className={cn("flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground", className)} {...props} />
 );
-const CommandInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & {type?: string}> = ({ className, type, ...props }) => (
+
+// Explicitly define type for CommandInput props to avoid implicit any
+interface CommandInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  type?: string; // type is an optional string
+}
+const CommandInput: React.FC<CommandInputProps> = ({ className, type, ...props }) => (
   <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
     <input type={type} className={cn("flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 focus-visible:ring-0 focus-visible:ring-offset-0", className)} {...props} />
@@ -379,16 +388,25 @@ const CommandList: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className
 const CommandEmpty: React.FC<React.HTMLAttributes<HTMLDivElement>> = (props) => (
   <div className="py-6 text-center text-sm" {...props} />
 );
-const CommandGroup: React.FC<React.HTMLAttributes<HTMLDivElement> & { heading?: string }> = ({ className, heading, ...props }) => (
+
+interface CommandGroupProps extends React.HTMLAttributes<HTMLDivElement> {
+  heading?: string;
+}
+const CommandGroup: React.FC<CommandGroupProps> = ({ className, heading, ...props }) => (
   <div className={cn("overflow-hidden p-1 text-foreground", className)} {...props}>
     {heading && <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{heading}</div>}
     {props.children}
   </div>
 );
-const CommandItem: React.FC<React.HTMLAttributes<HTMLDivElement> & { onSelect?: () => void }> = ({ className, onSelect, ...props }) => (
+
+// Correctly type CommandItem to potentially accept onSelect from mapping
+interface CommandItemProps extends React.HTMLAttributes<HTMLDivElement> {
+  onSelect?: () => void; 
+}
+const CommandItem: React.FC<CommandItemProps> = ({ className, onSelect, ...props }) => (
   <div
     className={cn("relative flex cursor-default select-none items-center rounded-sm text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)}
-    onClick={onSelect}
+    onClick={onSelect} // if onSelect is provided, use it
     {...props}
   />
 );
