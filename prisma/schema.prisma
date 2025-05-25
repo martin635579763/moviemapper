@@ -1,0 +1,47 @@
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Movie {
+  id          String     @id @default(cuid())
+  title       String
+  description String
+  posterUrl   String
+  duration    String
+  genre       String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  schedules   Schedule[]
+}
+
+model Hall {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  rows      Int
+  cols      Int
+  gridJson  String // Storing the grid as a JSON string
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  schedules Schedule[]
+}
+
+model Schedule {
+  id        String   @id @default(cuid())
+  movieId   String
+  movie     Movie    @relation(fields: [movieId], references: [id])
+  hallId    String
+  hall      Hall     @relation(fields: [hallId], references: [id])
+  day       String // For simplicity, matching current structure. Consider DateTime for robust scheduling.
+  time      String // For simplicity, matching current structure. Consider DateTime.
+  dateTime  DateTime // The actual showtime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([hallId, dateTime], name: "unique_hall_datetime")
+}

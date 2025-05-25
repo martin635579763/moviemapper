@@ -33,22 +33,20 @@ export interface LayoutContextType {
   setPreviewMode: React.Dispatch<React.SetStateAction<PreviewMode>>;
   initializeLayout: (rows: number, cols: number, name?: string) => void;
   updateCell: (row: number, col: number) => void;
-  loadLayout: (newLayout: HallLayout | null) => void;
+  loadLayout: (newLayoutOrName: HallLayout | string | null) => Promise<void> | void; // Can be async if loading by name
   exportLayout: () => void;
 
-  saveLayoutToStorage: (saveName: string) => boolean;
-  loadLayoutFromStorage: (layoutName: string) => void;
-  deleteStoredLayout: (layoutName: string) => void;
-  // getStoredLayoutNames: () => string[]; // This direct getter is no longer exposed
+  saveLayoutToStorage: (saveName: string) => Promise<boolean>; // Now async
+  loadLayoutFromStorage: (layoutName: string) => Promise<void>; // Now async
+  deleteStoredLayout: (layoutName: string) => Promise<void>; // Now async
   
-  // Reactive list of stored layout names and its refresher
   storedLayoutNames: string[]; 
-  refreshStoredLayoutNames: () => void;
+  refreshStoredLayoutNames: () => Promise<void>; // Now async
 
-  // Ticket purchasing related functions and state
   selectedSeatsForPurchase: CellData[];
   toggleSeatSelection: (row: number, col: number) => void;
   confirmTicketPurchase: () => void;
   clearSeatSelection: () => void;
-}
 
+  isLoadingLayouts: boolean; // For UI to show loading state
+}

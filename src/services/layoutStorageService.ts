@@ -1,40 +1,53 @@
 
 'use client';
 
-import type { HallLayout } from '@/types/layout';
+import type { HallLayout, CellData } from '@/types/layout';
 
-export const LOCAL_STORAGE_INDEX_KEY = 'seatLayout_index_v1';
-export const LOCAL_STORAGE_LAYOUT_PREFIX = 'seatLayout_item_v1_';
+// This service now interacts with API endpoints instead of localStorage
 
-export function getStoredLayoutNamesService(): string[] {
-  if (typeof window === 'undefined') return [];
+export async function getStoredLayoutNamesService(): Promise<string[]> {
   try {
-    const indexJson = localStorage.getItem(LOCAL_STORAGE_INDEX_KEY);
-    const names = indexJson ? JSON.parse(indexJson) : [];
-    return Array.isArray(names) ? [...names].sort() : [];
+    const response = await fetch('/api/layouts');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      console.error("Service: Failed to fetch layout names:", errorData.message);
+      return [];
+    }
+    const names = await response.json();
+    return Array.isArray(names) ? names.sort() : [];
   } catch (e) {
-    console.error("Service: Failed to parse stored layout names from localStorage:", e);
+    console.error("Service: Error fetching stored layout names from API:", e);
     return [];
   }
 }
 
-export function loadLayoutFromStorageService(layoutName: string): HallLayout | null {
-  if (typeof window === 'undefined') return null;
+export async function loadLayoutFromStorageService(layoutName: string): Promise<HallLayout | null> {
   try {
-    const layoutJson = localStorage.getItem(LOCAL_STORAGE_LAYOUT_PREFIX + layoutName);
-    if (layoutJson) {
-      const loadedLayout = JSON.parse(layoutJson) as HallLayout;
-      if (!loadedLayout || !loadedLayout.grid || !loadedLayout.rows || !loadedLayout.cols) {
-        console.error(`Service: Invalid layout structure for "${layoutName}".`);
-        localStorage.removeItem(LOCAL_STORAGE_LAYOUT_PREFIX + layoutName); // Clean up invalid entry
-        // Optionally, update index if this function knew about it. For now, just log.
+    const response = await fetch(`/api/layouts/${encodeURIComponent(layoutName)}`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.warn(`Service: Layout "${layoutName}" not found via API.`);
         return null;
       }
-      return loadedLayout;
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      console.error(`Service: Failed to fetch layout "${layoutName}" from API:`, errorData.message);
+      return null;
     }
-    return null;
+    const loadedLayout = await response.json() as HallLayout;
+     if (!loadedLayout || !loadedLayout.grid || !loadedLayout.rows || !loadedLayout.cols) {
+        console.error(`Service: Invalid layout structure received from API for "${layoutName}".`);
+        return null;
+      }
+    // Reconstruct screenCellIds if necessary (API might not return it directly in this format)
+    loadedLayout.screenCellIds = [];
+    loadedLayout.grid.forEach(row => row.forEach(cell => {
+        if (cell.type === 'screen') {
+            loadedLayout.screenCellIds.push(cell.id);
+        }
+    }));
+    return loadedLayout;
   } catch (error) {
-    console.error(`Service: Failed to parse stored layout "${layoutName}" from localStorage:`, error);
+    console.error(`Service: Error fetching stored layout "${layoutName}" from API:`, error);
     return null;
   }
 }
@@ -42,101 +55,123 @@ export function loadLayoutFromStorageService(layoutName: string): HallLayout | n
 interface SaveLayoutResult {
   success: boolean;
   message: string;
-  updatedNames?: string[];
-  savedLayout?: HallLayout;
-  operationType: 'saved_new' | 'updated_existing' | 'cancelled' | 'error';
+  savedLayout?: HallLayout; // The layout as saved/returned by API (might include ID, timestamps)
+  operationType: 'saved_new' | 'updated_existing' | 'cancelled' | 'error' | 'conflict';
 }
 
-export function saveLayoutToStorageService(
+// This function now handles both creating new layouts and updating existing ones.
+// The `confirm` dialog for overwrite should happen in the component before calling this,
+// or the API can implement an "upsert" or have separate create/update endpoints.
+// For simplicity, we'll assume the API's POST creates, and PUT updates.
+// We need to check if the layout exists first to decide whether to POST (create) or PUT (update).
+export async function saveLayoutToStorageService(
   layoutToSaveInput: HallLayout,
-  currentStoredNames: string[]
-): SaveLayoutResult {
-  if (typeof window === 'undefined') {
-    return { success: false, message: "Cannot save, window not available.", operationType: 'error' };
-  }
-
+  currentStoredApiNames: string[] // Names fetched from API
+): Promise<SaveLayoutResult> {
+  
   const trimmedSaveName = layoutToSaveInput.name.trim();
   if (!trimmedSaveName) {
     return { success: false, message: "Layout name cannot be empty.", operationType: 'error' };
   }
 
-  const layoutToSave = { ...layoutToSaveInput, name: trimmedSaveName };
+  const layoutPayload = {
+    name: trimmedSaveName,
+    rows: layoutToSaveInput.rows,
+    cols: layoutToSaveInput.cols,
+    grid: layoutToSaveInput.grid,
+  };
 
-  console.log("[SERVICE_SAVE_LAYOUT] Attempting to save with name:", `'${trimmedSaveName}'`);
-  console.log("[SERVICE_SAVE_LAYOUT] Current stored names:", currentStoredNames);
-
-  const insensitiveMatchOriginalCase = currentStoredNames.find(
-    storedName => storedName.toLowerCase() === trimmedSaveName.toLowerCase()
+  const nameExistsInApi = currentStoredApiNames.some(
+    name => name.toLowerCase() === trimmedSaveName.toLowerCase()
   );
-  console.log("[SERVICE_SAVE_LAYOUT] Found existing (case-insensitive):", insensitiveMatchOriginalCase);
+
+  let operationType: 'saved_new' | 'updated_existing' = nameExistsInApi ? 'updated_existing' : 'saved_new';
 
   try {
-    if (insensitiveMatchOriginalCase) {
-      console.log("[SERVICE_SAVE_LAYOUT] Existing name found. Preparing to call confirm().");
-      const confirmed = confirm(
-        `Layout "${insensitiveMatchOriginalCase}" already exists. Overwrite with current edits and save as "${trimmedSaveName}"?`
-      );
-      console.log("[SERVICE_SAVE_LAYOUT] confirm() returned:", confirmed);
+    let response;
+    if (operationType === 'updated_existing') {
+      // If name exists, attempt to update it.
+      // The API uses the original name in the URL for PUT, and the payload contains new data.
+      // We need the original name if the user changed the casing or the name itself.
+      const originalName = currentStoredApiNames.find(n => n.toLowerCase() === trimmedSaveName.toLowerCase()) || trimmedSaveName;
 
-      if (!confirmed) {
-        return {
-          success: false,
-          message: `Overwrite of layout "${insensitiveMatchOriginalCase}" was cancelled by the user.`,
-          operationType: 'cancelled'
-        };
-      }
+      // If user changed the name of an existing layout to a new name that ALSO already exists,
+      // this simple PUT will fail if the new name is different from originalName.
+      // A more robust API would handle name changes better (e.g., separate endpoint or by ID).
+      // For now, we assume PUT updates the layout found by originalName in the URL.
+      // If the payload.name is different, Prisma might throw an error if 'name' must be unique and you're trying to change it to another existing name.
+      // Or, you might need a dedicated API endpoint to handle renaming.
 
-      console.log("[SERVICE_SAVE_LAYOUT] Overwrite confirmed by user. Proceeding to update.");
-      let updatedNames = currentStoredNames.filter(
-        name => name.toLowerCase() !== insensitiveMatchOriginalCase.toLowerCase()
-      );
-      // Ensure all case variations of the old name are removed from storage
-      currentStoredNames.forEach(storedName => {
-        if (storedName.toLowerCase() === insensitiveMatchOriginalCase.toLowerCase()) {
-          console.log(`[SERVICE_SAVE_LAYOUT] Removing old item from localStorage: ${LOCAL_STORAGE_LAYOUT_PREFIX + storedName}`);
-          localStorage.removeItem(LOCAL_STORAGE_LAYOUT_PREFIX + storedName);
-        }
+      // For simplicity, if a name change is intended, the user should delete and re-create, or the API needs to support it.
+      // We'll assume we are updating the content of a layout with 'originalName'
+      
+      // Let's assume the user isn't changing the name via this save operation, only its content.
+      // If they want to change the name, they should use "Save as new name".
+      // So, if operationType is 'updated_existing', we use the matched 'originalName' for the PUT request.
+      // The payload's name (`trimmedSaveName`) should ideally match `originalName` unless the API handles name changes via PUT on the old name.
+
+      // Simplified: If we are "updating", we are updating the layout identified by `originalName` in the URL.
+      // The payload `name` property within `layoutPayload` should be the *target* name.
+      // If `trimmedSaveName` is different from `originalName`, it implies a rename.
+      // Prisma's `update({ where: { name: originalName }, data: { name: trimmedSaveName, ... } })` would handle renaming.
+      // Our API PUT `src/app/api/layouts/[layoutName]/route.ts` currently does NOT allow changing the `name` field itself,
+      // as it updates `where: { name: layoutNameFromParams }`.
+      // So, if `trimmedSaveName` != `originalName`, we should treat it as creating a new one and error if `trimmedSaveName` exists,
+      // or allow overwriting `trimmedSaveName` if user confirms.
+
+      // Current simplification: User confirms overwrite client-side. We then call PUT if the name (case-insensitive) exists.
+      // The PUT request updates the layout identified by its name in the URL.
+
+      response = await fetch(`/api/layouts/${encodeURIComponent(originalName)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(layoutPayload), // The payload contains the potentially new name
       });
-      
-      updatedNames.push(trimmedSaveName); // Add the new name (could be different casing)
-      updatedNames.sort();
 
-      console.log(`[SERVICE_SAVE_LAYOUT] Saving updated layout as: ${LOCAL_STORAGE_LAYOUT_PREFIX + trimmedSaveName}`);
-      localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + trimmedSaveName, JSON.stringify(layoutToSave));
-      console.log(`[SERVICE_SAVE_LAYOUT] Updating index in localStorage with names:`, updatedNames);
-      localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(updatedNames));
-      
-      return {
-        success: true,
-        message: `Layout "${trimmedSaveName}" updated.`,
-        updatedNames,
-        savedLayout: layoutToSave,
-        operationType: 'updated_existing'
-      };
-
-    } else {
-      console.log("[SERVICE_SAVE_LAYOUT] No existing name found. Saving as new.");
-      let updatedNames = [...currentStoredNames, trimmedSaveName];
-      updatedNames.sort();
-      
-      console.log(`[SERVICE_SAVE_LAYOUT] Saving new layout as: ${LOCAL_STORAGE_LAYOUT_PREFIX + trimmedSaveName}`);
-      localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + trimmedSaveName, JSON.stringify(layoutToSave));
-      console.log(`[SERVICE_SAVE_LAYOUT] Updating index in localStorage with names:`, updatedNames);
-      localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(updatedNames));
-
-      return {
-        success: true,
-        message: `Layout "${trimmedSaveName}" saved as new.`,
-        updatedNames,
-        savedLayout: layoutToSave,
-        operationType: 'saved_new'
-      };
+    } else { // operationType === 'saved_new'
+      response = await fetch('/api/layouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(layoutPayload),
+      });
+      operationType = 'saved_new';
     }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      if (response.status === 409) { // Conflict, e.g., name already exists on POST
+         return { success: false, message: errorData.message || 'Layout name already exists.', operationType: 'conflict' };
+      }
+      return { success: false, message: errorData.message || `Failed to ${operationType === 'updated_existing' ? 'update' : 'save'} layout.`, operationType: 'error' };
+    }
+
+    const savedOrUpdatedLayoutData = await response.json();
+    
+    // Reconstruct HallLayout from what API returns (it's likely just the Prisma Hall model)
+    const finalLayout: HallLayout = {
+        name: savedOrUpdatedLayoutData.name,
+        rows: savedOrUpdatedLayoutData.rows,
+        cols: savedOrUpdatedLayoutData.cols,
+        grid: JSON.parse(savedOrUpdatedLayoutData.gridJson),
+        screenCellIds: [], // Derive again
+    };
+    finalLayout.grid.forEach(row => row.forEach(cell => {
+        if (cell.type === 'screen') finalLayout.screenCellIds.push(cell.id);
+    }));
+
+
+    return {
+      success: true,
+      message: `Layout "${trimmedSaveName}" ${operationType === 'updated_existing' ? 'updated' : 'saved'}.`,
+      savedLayout: finalLayout,
+      operationType: operationType,
+    };
+
   } catch (e: any) {
-    console.error("[SERVICE_SAVE_LAYOUT] Error during save operation:", e);
+    console.error("[SERVICE_SAVE_LAYOUT_API] Error during save operation:", e);
     return {
       success: false,
-      message: `Could not save layout: ${e.message || 'Unknown error'}`,
+      message: `Could not save layout via API: ${e.message || 'Unknown error'}`,
       operationType: 'error'
     };
   }
@@ -145,20 +180,20 @@ export function saveLayoutToStorageService(
 interface DeleteLayoutResult {
   success: boolean;
   message: string;
-  updatedNames?: string[];
 }
 
-export function deleteStoredLayoutService(layoutName: string, currentStoredNames: string[]): DeleteLayoutResult {
-  if (typeof window === 'undefined') {
-     return { success: false, message: "Cannot delete, window not available." };
-  }
+export async function deleteStoredLayoutService(layoutName: string): Promise<DeleteLayoutResult> {
   try {
-    localStorage.removeItem(LOCAL_STORAGE_LAYOUT_PREFIX + layoutName);
-    const updatedNames = currentStoredNames.filter(name => name !== layoutName).sort();
-    localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(updatedNames));
-    return { success: true, message: `Layout "${layoutName}" deleted from browser.`, updatedNames };
+    const response = await fetch(`/api/layouts/${encodeURIComponent(layoutName)}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      return { success: false, message: errorData.message || 'Failed to delete layout.' };
+    }
+    return { success: true, message: `Layout "${layoutName}" deleted.` };
   } catch (e: any) {
-    console.error("Service: Failed to delete layout from localStorage:", e);
+    console.error("Service: Failed to delete layout via API:", e);
     return { success: false, message: `Could not delete layout: ${e.message || 'Unknown error'}` };
   }
 }
