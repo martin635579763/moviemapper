@@ -1,4 +1,3 @@
-
 import type { HallLayout } from '@/types/layout';
 // Removed unused import: import { sampleLayouts as staticSampleLayouts } from './sample-layouts';
 
@@ -41,17 +40,18 @@ const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
     genre: "Sci-Fi, Adventure",
   },
   {
-    id: '5',
-    title: 'Echoes of the Past',
-    description: 'A historian uncovers a hidden journal that leads to a forgotten city, revealing secrets that could rewrite history.',
-    posterUrl: 'https://image.tmdb.org/t/p/w500/yhXy2l3xpiiNWCnOR9Y2T3MC22P.jpg',
+    id: '5', // Keep ID unique, or re-use if '5' was the problematic one. Let's use a new ID if '5' was Echoes of the Past's ID.
+             // Assuming '5' was the original ID for "Echoes of the Past".
+    title: 'Chronicles of the Ancient Realm',
+    description: 'An archaeologist deciphers an ancient prophecy predicting a celestial event, leading her on a perilous quest to find a mythical artifact before it falls into the wrong hands.',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/x5q4e52c3g5s02s698txjGuF5wL.jpg', // Stargate poster
     detailImageUrls: [
-      getDetailImageUnsplashUrl('ancient ruins desert', 600, 400),
-      getDetailImageUnsplashUrl('old map treasure', 600, 400),
+      getDetailImageUnsplashUrl('ancient artifact pyramid', 600, 400),
+      getDetailImageUnsplashUrl('archaeologist discovery', 600, 400),
     ],
     associatedLayoutName: 'Small Hall',
-    duration: "2h 00m",
-    genre: "Adventure, Mystery",
+    duration: "2h 15m",
+    genre: "Adventure, Fantasy",
   },
   {
     id: '3',
@@ -104,6 +104,8 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
       const names = indexJson ? JSON.parse(indexJson) : [];
       if (Array.isArray(names)) {
         storedLayoutNames = names.filter(name => typeof name === 'string');
+      } else {
+        storedLayoutNames = [];
       }
 
       const prefsJson = localStorage.getItem(LOCAL_STORAGE_FILM_HALL_PREFERENCES_KEY);
@@ -114,6 +116,10 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
 
     } catch (e) {
       console.error("Error reading from localStorage in films.ts:", e);
+      // Keep default empty values if localStorage fails
+      storedLayoutNames = [];
+      filmHallPrefs = {};
+      userDefinedSchedules = {};
     }
   }
 
@@ -144,31 +150,42 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
     const filmSpecificPreferences = filmHallPrefs[baseFilm.id];
 
     if (filmSpecificPreferences && filmSpecificPreferences.length > 0) {
+      // Use preferred halls, but only if they currently exist as saved layouts
       hallsToUseForThisFilm = filmSpecificPreferences.filter(hallName => globallyAvailableSavedHalls.has(hallName));
     } else {
+      // No preferences set, or preferred halls don't exist. Use all currently saved halls.
       hallsToUseForThisFilm = [...globallyAvailableSavedHalls];
     }
-
+    
+    // If after checking preferences, no valid halls are found, the schedule will be empty.
+    // Only generate schedule if there are halls to use.
     if (hallsToUseForThisFilm.length > 0) {
       DAYS_FOR_GENERATION.forEach(day => {
+        // Shuffle halls for variety for each day
         const shuffledHallsForDay = [...hallsToUseForThisFilm].sort(() => 0.5 - Math.random());
-        const numHallsToShowPerDay = Math.min(shuffledHallsForDay.length, 2);
+        // Show in up to 2 halls per day for this film (or fewer if less halls are available/preferred)
+        const numHallsToShowPerDay = Math.min(shuffledHallsForDay.length, 2); 
 
         for (let i = 0; i < numHallsToShowPerDay; i++) {
           const hallName = shuffledHallsForDay[i];
-          const numShowtimesInHall = Math.floor(Math.random() * 2) + 1; // 1 or 2 showtimes
+          // Randomly 1 or 2 showtimes per hall per day
+          const numShowtimesInHall = Math.floor(Math.random() * 2) + 1; 
           const timesForThisHall: string[] = [];
+          
+          // Create a mutable copy of possible times to pick from without replacement for this hall+day
           const availableTimes = [...POSSIBLE_TIMES_FOR_GENERATION];
           
           while(timesForThisHall.length < numShowtimesInHall && availableTimes.length > 0) {
             const randomTimeIndex = Math.floor(Math.random() * availableTimes.length);
-            const randomTime = availableTimes.splice(randomTimeIndex, 1)[0];
-            if (!timesForThisHall.includes(randomTime)) {
+            const randomTime = availableTimes.splice(randomTimeIndex, 1)[0]; // Pick and remove
+            if (!timesForThisHall.includes(randomTime)) { // Should always be true due to splice
                 timesForThisHall.push(randomTime);
             }
           }
 
           timesForThisHall.forEach(time => {
+            // Check for duplicates before adding to ensure unique entries if logic somehow allows it
+            // (though current logic should prevent it)
              if (!dynamicSchedule.some(e => e.day === day && e.time === time && e.hallName === hallName)) {
                 dynamicSchedule.push({ day, time, hallName });
             }
@@ -177,6 +194,7 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
       });
     }
 
+    // Sort the generated schedule
     dynamicSchedule.sort((a, b) => {
       if (a.day !== b.day) return DAYS_FOR_GENERATION.indexOf(a.day) - DAYS_FOR_GENERATION.indexOf(b.day);
       const timeA = POSSIBLE_TIMES_FOR_GENERATION.indexOf(a.time);
@@ -191,3 +209,48 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
     };
   });
 }
+
+// Adding some sample schedules to the new "Chronicles of the Ancient Realm" film (id: '5')
+// and ensuring other films have varied schedules for "hall one", "hall two", "hall 3" for demo purposes.
+// This part is now handled by the dynamic schedule generation logic above, 
+// but let's ensure the BASE_FILM_DATA is clean.
+
+// The actual schedule generation happens in getSampleFilmsWithDynamicSchedules.
+// The `hallName`s used in the "ScheduleEntry" objects within that function will be
+// dynamically chosen from `allAvailableHallNames` which includes "hall one", "hall two", "hall 3" if they are saved.
+// For the static schedule example (if it were still used), it would look like this:
+/*
+const updatedSampleFilms = sampleFilms.map(film => {
+  if (film.id === '1') { // Adventure in the Cosmos
+    return { ...film, schedule: [
+      { day: "Today", time: "2:00 PM", hallName: "hall one" },
+      { day: "Today", time: "7:00 PM", hallName: "hall two" },
+      { day: "Tomorrow", time: "5:15 PM", hallName: "hall one" },
+    ]};
+  }
+  if (film.id === '5') { // Chronicles of the Ancient Realm
+    return { ...film, schedule: [
+      { day: "Today", time: "4:30 PM", hallName: "hall 3" },
+      { day: "Tomorrow", time: "2:30 PM", hallName: "hall 3" },
+      { day: "Tomorrow", time: "7:45 PM", hallName: "hall one" },
+    ]};
+  }
+  if (film.id === '3') { // VIP Premiere Night
+    return { ...film, schedule: [
+      { day: "Next Day", time: "7:00 PM", hallName: "hall two" },
+      { day: "Next Day", time: "9:00 PM", hallName: "hall 3" },
+    ]};
+  }
+   if (film.id === '4') { // The Last Stand
+    return { ...film, schedule: [
+      { day: "Today", time: "9:30 PM", hallName: "hall one" },
+      { day: "Tomorrow", time: "4:30 PM", hallName: "hall two" },
+    ]};
+  }
+  return film;
+});
+
+export { updatedSampleFilms as sampleFilms };
+*/
+// The above static update is no longer needed as schedules are fully dynamic.
+// The `hallName` check happens within `getSampleFilmsWithDynamicSchedules`.
