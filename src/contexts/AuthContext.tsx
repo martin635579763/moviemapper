@@ -4,6 +4,11 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation'; // For redirects
+import { 
+  getManagerStatusService, 
+  setManagerStatusService, 
+  clearManagerStatusService 
+} from '@/services/authService';
 
 interface AuthContextType {
   isManager: boolean;
@@ -13,50 +18,29 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const MANAGER_STORAGE_KEY = 'cinemaApp_isManager_v1';
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isManager, setIsManager] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true); // To prevent flash of unauth content
   const router = useRouter();
 
   useEffect(() => {
-    // Check localStorage for persisted manager status on initial load
+    // Check localStorage for persisted manager status on initial load via service
     if (typeof window !== 'undefined') {
-      try {
-        const storedIsManager = localStorage.getItem(MANAGER_STORAGE_KEY);
-        setIsManager(storedIsManager === 'true');
-      } catch (error) {
-        console.error("Error reading manager status from localStorage", error);
-        setIsManager(false);
-      } finally {
-        setLoading(false);
-      }
+      setIsManager(getManagerStatusService());
+      setLoading(false);
     } else {
       setLoading(false); // Not in browser, so no persisted state
     }
   }, []);
 
   const loginManager = useCallback(() => {
+    setManagerStatusService(true);
     setIsManager(true);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(MANAGER_STORAGE_KEY, 'true');
-      } catch (error) {
-        console.error("Error saving manager status to localStorage", error);
-      }
-    }
   }, []);
 
   const logoutManager = useCallback(() => {
+    clearManagerStatusService();
     setIsManager(false);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem(MANAGER_STORAGE_KEY);
-      } catch (error) {
-        console.error("Error removing manager status from localStorage", error);
-      }
-    }
     router.push('/'); // Redirect to home on logout
   }, [router]);
 
