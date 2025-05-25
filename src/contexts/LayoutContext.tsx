@@ -29,7 +29,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     try {
       const indexJson = localStorage.getItem(LOCAL_STORAGE_INDEX_KEY);
       const names = indexJson ? JSON.parse(indexJson) : [];
-      setCtxStoredLayoutNames(Array.isArray(names) ? [...names] : []); 
+      setCtxStoredLayoutNames(Array.isArray(names) ? [...names].sort() : []); 
     } catch (e) {
       console.error("Failed to parse stored layout names from localStorage:", e);
       setCtxStoredLayoutNames([]); 
@@ -123,6 +123,9 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
           if (newCell.type === 'seat' && !newCell.status) {
             newCell.status = 'available' as SeatStatus;
           }
+          // Remove transient preview properties if they exist
+          delete (newCell as any).isOccluded;
+          delete (newCell as any).hasGoodView;
           return newCell;
         }))
       };
@@ -135,10 +138,10 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [toast]);
 
-  const exportLayout = () => {
+  const exportLayout = useCallback(() => {
     const layoutToExport = { ...layout };
     layoutToExport.grid = layoutToExport.grid.map(row => row.map(cell => {
-        const { isOccluded, hasGoodView, ...restOfCell } = cell; 
+        const { isOccluded, hasGoodView, ...restOfCell } = cell as CellData & {isOccluded?: boolean, hasGoodView?:boolean}; 
         if (restOfCell.type === 'seat' && restOfCell.status === 'selected') {
           return { ...restOfCell, status: 'available' as SeatStatus };
         }
@@ -156,14 +159,14 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     document.body.removeChild(link);
     URL.revokeObjectURL(href);
     toast({ title: "Success", description: `Layout "${layoutToExport.name}" exported.` });
-  };
+  },[layout, toast]);
 
   const getStoredLayoutNames = useCallback((): string[] => {
     if (typeof window === 'undefined') return [];
     try {
       const indexJson = localStorage.getItem(LOCAL_STORAGE_INDEX_KEY);
       const names = indexJson ? JSON.parse(indexJson) : [];
-      return Array.isArray(names) ? names : [];
+      return Array.isArray(names) ? names.sort() : [];
     } catch (e) {
       console.error("Failed to parse stored layout names from localStorage during get:", e);
       return [];
@@ -181,31 +184,12 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "Error", description: "Layout name cannot be empty." });
       return false;
     }
-
-    const currentStoredNames = getStoredLayoutNames();
-    let existingNameFound: string | undefined = undefined;
-    const saveNameLower = saveName.toLowerCase();
-
-    for (const storedName of currentStoredNames) {
-      if (storedName.toLowerCase() === saveNameLower) {
-        existingNameFound = storedName; 
-        break;
-      }
-    }
-
-    if (existingNameFound) {
-      const confirmationMessage = `Layout "${existingNameFound}" already exists. Overwrite with current edits and save as "${saveName}"?`;
-      if (!confirm(confirmationMessage)) {
-        toast({ title: "Save Cancelled", description: `Overwrite of layout "${existingNameFound}" was cancelled by the user.`, variant: "default" });
-        return false;
-      }
-    }
     
     const layoutToSave: HallLayout = {
       ...layout,
       name: saveName, 
       grid: layout.grid.map(row => row.map(cell => {
-        const { isOccluded, hasGoodView, ...restOfCell } = cell;
+        const { isOccluded, hasGoodView, ...restOfCell } = cell as CellData & {isOccluded?: boolean, hasGoodView?:boolean};
         if (restOfCell.type === 'seat' && restOfCell.status === 'selected') {
           return { ...restOfCell, status: 'available' as SeatStatus };
         }
@@ -214,32 +198,60 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     };
 
     try {
-      let updatedNames = [...currentStoredNames];
-      if (existingNameFound) {
-        // Remove all case-insensitive matches of the original existing name
-        const originalExistingNameLower = existingNameFound.toLowerCase();
-        updatedNames = updatedNames.filter(name => name.toLowerCase() !== originalExistingNameLower);
-        
-        // Also explicitly remove the item with the original casing from storage
-        // This loop is to ensure if multiple items with same name (diff case) existed, they are cleared before re-adding.
+      const currentStoredNames = getStoredLayoutNames();
+      const saveNameLower = saveName.toLowerCase();
+      let insensitiveMatchOriginalCase: string | undefined = undefined;
+
+      for (const storedName of currentStoredNames) {
+        if (storedName.toLowerCase() === saveNameLower) {
+          insensitiveMatchOriginalCase = storedName;
+          break;
+        }
+      }
+
+      if (insensitiveMatchOriginalCase) {
+        // Name exists, potentially with different casing. Confirm overwrite.
+        const confirmed = confirm(
+          `Layout "${insensitiveMatchOriginalCase}" already exists. Overwrite with current edits and save as "${saveName}"?`
+        );
+        if (!confirmed) {
+          toast({ title: "Save Cancelled", description: `Overwrite of layout "${insensitiveMatchOriginalCase}" was cancelled by the user.`, variant: "default" });
+          return false;
+        }
+
+        // Proceed with overwrite
+        let updatedNames = currentStoredNames.filter(
+          name => name.toLowerCase() !== insensitiveMatchOriginalCase!.toLowerCase()
+        );
+        // Remove old items from storage that match insensitively
         currentStoredNames.forEach(storedName => {
-            if (storedName.toLowerCase() === originalExistingNameLower) {
+            if (storedName.toLowerCase() === insensitiveMatchOriginalCase!.toLowerCase()) {
                 localStorage.removeItem(LOCAL_STORAGE_LAYOUT_PREFIX + storedName);
             }
         });
-      }
-      
-      if (!updatedNames.some(n => n === saveName)) { // Add the new name if not already present (exact case)
-          updatedNames.push(saveName);
-      }
-      
-      localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + saveName, JSON.stringify(layoutToSave));
-      localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(updatedNames.sort())); 
+        
+        updatedNames.push(saveName); // Add the new name (could be different casing)
+        localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + saveName, JSON.stringify(layoutToSave));
+        localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(updatedNames.sort()));
+        
+        setLayout(layoutToSave);
+        refreshStoredLayoutNames();
+        toast({ title: "Success", description: `Layout "${saveName}" updated in browser.` });
+        return true;
 
-      setLayout(layoutToSave); 
-      refreshStoredLayoutNames(); 
-      toast({ title: "Success", description: `Layout "${saveName}" saved to browser.` });
-      return true;
+      } else {
+        // Save as a new layout
+        let updatedNames = [...currentStoredNames];
+        updatedNames.push(saveName);
+        
+        localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + saveName, JSON.stringify(layoutToSave));
+        localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(updatedNames.sort()));
+
+        setLayout(layoutToSave);
+        refreshStoredLayoutNames();
+        toast({ title: "Success", description: `Layout "${saveName}" saved as new to browser.` });
+        return true;
+      }
     } catch (e: any) {
       console.error("Failed to save layout to localStorage:", e);
       toast({ variant: "destructive", title: "Error", description: `Could not save layout: ${e.message || 'Unknown error'}` });
@@ -341,4 +353,3 @@ export const useLayoutContext = () => {
   }
   return context;
 };
-
