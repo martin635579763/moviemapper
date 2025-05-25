@@ -24,8 +24,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"; 
-import { getSampleFilmsWithDynamicSchedules, type Film } from '@/data/films'; // Added
-import { Badge } from "@/components/ui/badge"; // Added
+import { getSampleFilmsWithDynamicSchedules, type Film } from '@/data/films';
+import { Badge } from "@/components/ui/badge";
 
 const TOOLBAR_TOOLS_CONFIG: { value: EditorTool; label: string; icon: React.ElementType }[] = [
   { value: 'select', label: 'Select', icon: MousePointer },
@@ -62,8 +62,8 @@ export const AppToolbar: React.FC = () => {
   const [saveLayoutNameInput, setSaveLayoutNameInput] = useState("");
   const [layoutToDelete, setLayoutToDelete] = useState<string | null>(null);
   
-  const [filmsWithSchedules, setFilmsWithSchedules] = useState<Film[]>([]); // Added
-  const [isManagePopoverOpen, setIsManagePopoverOpen] = useState(false); // Added
+  const [filmsWithSchedules, setFilmsWithSchedules] = useState<Film[]>([]);
+  const [isManagePopoverOpen, setIsManagePopoverOpen] = useState(false);
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -316,6 +316,7 @@ export const AppToolbar: React.FC = () => {
                                 e.stopPropagation(); 
                                 setLayoutToDelete(name); 
                             }}
+                            disabled={isHallInUse(name)}
                         >
                             Delete
                         </Button>
@@ -378,3 +379,4 @@ const CommandItem: React.FC<React.HTMLAttributes<HTMLDivElement> & { onSelect?: 
     {...props}
   />
 );
+
