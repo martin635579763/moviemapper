@@ -12,17 +12,44 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-let app: FirebaseApp;
-let db: Firestore;
+// Log the resolved config to help with debugging environment variables
+console.log("Firebase Config being used by the application:", firebaseConfig);
+
+// Check if all essential config values are present
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.error(
+    "Firebase config is missing essential values (apiKey or projectId). " +
+    "Please ensure your .env.local file is correctly set up with all NEXT_PUBLIC_FIREBASE_ prefixed variables " +
+    "and that you have restarted your Next.js development server after creating/modifying it."
+  );
+}
+
+let app: FirebaseApp | undefined = undefined;
+let db: Firestore | undefined = undefined;
 // let auth: Auth; // For Firebase Auth later
 
 if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) { // Only attempt init if essential config is present
+    try {
+      app = initializeApp(firebaseConfig);
+      console.log("Firebase app initialized successfully.");
+      db = getFirestore(app);
+    } catch (e) {
+      console.error("Error initializing Firebase app:", e);
+      // app and db will remain undefined
+    }
+  } else {
+    console.warn("Firebase app not initialized due to missing essential configuration.");
+  }
 } else {
   app = getApps()[0];
+  if (app) { // Ensure app is defined
+     db = getFirestore(app);
+     console.log("Firebase app already initialized. Firestore instance obtained.");
+  } else {
+    console.error("Firebase app was expected to be initialized but is not. Cannot get Firestore instance.")
+  }
+ 
 }
-
-db = getFirestore(app);
-// auth = getAuth(app); // For Firebase Auth later
 
 export { app, db /*, auth*/ };
