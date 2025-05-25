@@ -12,8 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-// Input component is no longer used directly for hall preferences, but might be for schedule times if we change that part
-// import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { ShieldAlert, ListVideo, Save, CalendarDays, Clock, Building2, Trash2, PlusCircle, RotateCcw, ArrowLeft } from 'lucide-react';
@@ -55,29 +53,43 @@ const FilmHallConfigPage: NextPage = () => {
   // Effect for initial data loading (all preferences, and films for the dropdown)
   useEffect(() => {
     if (isManager) {
+      console.log("[ADMIN_PAGE_EFFECT] Manager detected. Fetching initial data.");
       refreshStoredLayoutNames(); 
-      setAllFilmsData(getSampleFilmsWithDynamicSchedules()); // To populate film selector
+      
+      getSampleFilmsWithDynamicSchedules().then(films => {
+        console.log("[ADMIN_PAGE_EFFECT] Films received from getSampleFilmsWithDynamicSchedules:", films);
+        if (Array.isArray(films)) {
+          setAllFilmsData(films);
+        } else {
+          console.error("[ADMIN_PAGE_EFFECT] CRITICAL: getSampleFilmsWithDynamicSchedules did NOT return an array. Received:", films, "Type:", typeof films);
+          setAllFilmsData([]); 
+        }
+      }).catch(error => {
+        console.error("[ADMIN_PAGE_EFFECT] CRITICAL: Error fetching films from getSampleFilmsWithDynamicSchedules:", error);
+        setAllFilmsData([]); 
+      });
       
       const loadedPrefs = getAllFilmHallPreferencesService();
       setAllHallPreferences(loadedPrefs);
-      console.log("[ADMIN_PAGE] Loaded allHallPreferences from service:", loadedPrefs);
+      console.log("[ADMIN_PAGE_EFFECT] Loaded allHallPreferences from service:", loadedPrefs);
     } else {
+      console.log("[ADMIN_PAGE_EFFECT] Not a manager or manager status changed to false. Clearing film data.");
       setAllFilmsData([]); 
       setAllHallPreferences({});
     }
-  }, [isManager, refreshStoredLayoutNames]); // refreshStoredLayoutNames added for initial hall dropdown population
+  }, [isManager, refreshStoredLayoutNames]);
+  
 
   // Effect to update UI when a film is selected or related primary data changes
   useEffect(() => {
-    if (selectedFilmId && allFilmsData.length > 0) {
+    if (selectedFilmId && Array.isArray(allFilmsData) && allFilmsData.length > 0) {
       console.log("[ADMIN_PAGE] Selected film ID:", selectedFilmId);
       setCurrentFilmHallPreferences(allHallPreferences[selectedFilmId] || []);
       console.log("[ADMIN_PAGE] Set currentFilmHallPreferences for selected film:", allHallPreferences[selectedFilmId] || []);
       
-      const filmData = allFilmsData.find(f => f.id === selectedFilmId); // Get film with potentially custom schedule
+      const filmData = allFilmsData.find(f => f.id === selectedFilmId); 
       console.log("[ADMIN_PAGE] Found filmData for selected film (used for schedule display):", filmData);
       
-      // Load either user-defined schedule or default dynamic schedule for editing
       const allUserSchedules = getAllUserDefinedFilmSchedulesService();
       const userScheduleForSelectedFilm = allUserSchedules[selectedFilmId];
 
@@ -85,7 +97,7 @@ const FilmHallConfigPage: NextPage = () => {
         setEditableSchedule([...userScheduleForSelectedFilm]);
         console.log("[ADMIN_PAGE] Set editableSchedule from user-defined for selected film:", userScheduleForSelectedFilm);
       } else if (filmData?.schedule) {
-        setEditableSchedule([...filmData.schedule]); // Use default dynamic schedule if no custom one
+        setEditableSchedule([...filmData.schedule]); 
         console.log("[ADMIN_PAGE] Set editableSchedule from default dynamic for selected film:", filmData.schedule);
       } else {
         setEditableSchedule([]);
@@ -97,7 +109,7 @@ const FilmHallConfigPage: NextPage = () => {
       setEditableSchedule([]);
       console.log("[ADMIN_PAGE] No film selected, cleared preferences and schedule.");
     }
-  }, [selectedFilmId, allFilmsData, allHallPreferences]); // allHallPreferences needed to re-eval currentFilmHallPreferences
+  }, [selectedFilmId, allFilmsData, allHallPreferences]); 
 
   // Effect to manage the default for the "Add Showtime" hall input (newShowtimeHall)
   useEffect(() => {
@@ -114,7 +126,6 @@ const FilmHallConfigPage: NextPage = () => {
 
   const handleFilmSelect = (filmId: string) => {
     setSelectedFilmId(filmId);
-    // Reset newShowtimeHall to default when film changes
     if (storedLayoutNames.length > 0) {
       setNewShowtimeHall(storedLayoutNames[0]);
     } else {
@@ -129,6 +140,14 @@ const FilmHallConfigPage: NextPage = () => {
       return newPrefs;
     });
   };
+
+  const selectedFilm = useMemo(() => {
+    if (!Array.isArray(allFilmsData)) {
+      console.warn("[ADMIN_PAGE] allFilmsData is not an array in selectedFilm useMemo. Value:", allFilmsData);
+      return undefined;
+    }
+    return allFilmsData.find(f => f.id === selectedFilmId);
+  }, [allFilmsData, selectedFilmId]);
 
   const handleSaveHallPreferences = () => {
     if (!selectedFilmId) {
@@ -146,22 +165,22 @@ const FilmHallConfigPage: NextPage = () => {
 
     if (result.success) {
       setAllHallPreferences(newAllPrefs); 
-      
-      // Refresh allFilmsData to reflect changes in default schedules (if no custom one exists)
-      // This is important if the user hasn't set a custom schedule yet for this film.
       const allUserSchedules = getAllUserDefinedFilmSchedulesService();
       if (!allUserSchedules[selectedFilmId]) {
-        const updatedFilms = getSampleFilmsWithDynamicSchedules(); 
-        setAllFilmsData(updatedFilms); 
-        const updatedSelectedFilm = updatedFilms.find(f => f.id === selectedFilmId);
-        setEditableSchedule(updatedSelectedFilm?.schedule || []); // Update displayed schedule if it was default
+        getSampleFilmsWithDynamicSchedules().then(updatedFilms => { 
+          setAllFilmsData(Array.isArray(updatedFilms) ? updatedFilms : []); 
+          const updatedSelectedFilmData = Array.isArray(updatedFilms) ? updatedFilms.find(f => f.id === selectedFilmId) : undefined;
+          setEditableSchedule(updatedSelectedFilmData?.schedule || []);
+        }).catch(error => {
+            console.error("[ADMIN_PAGE] Error re-fetching films after saving hall preferences:", error);
+            setAllFilmsData([]);
+            setEditableSchedule([]);
+        });
         console.log("[ADMIN_PAGE] Hall prefs saved, no custom schedule exists, re-fetched films for default schedule update.");
       }
     }
   };
   
-  const selectedFilm = useMemo(() => allFilmsData.find(f => f.id === selectedFilmId), [allFilmsData, selectedFilmId]);
-
   const groupedEditableSchedule = useMemo(() => {
     if (!editableSchedule || editableSchedule.length === 0) return {};
     return editableSchedule.reduce((acc, entry) => {
@@ -169,7 +188,6 @@ const FilmHallConfigPage: NextPage = () => {
         acc[entry.day] = [];
       }
       acc[entry.day].push(entry);
-      // Sort entries within each day by time, then hall
       acc[entry.day].sort((a, b) => {
         const timeAIndex = POSSIBLE_TIMES_FOR_GENERATION.indexOf(a.time);
         const timeBIndex = POSSIBLE_TIMES_FOR_GENERATION.indexOf(b.time);
@@ -220,11 +238,24 @@ const FilmHallConfigPage: NextPage = () => {
     });
 
     if (result.success) {
-      // Update allFilmsData to reflect the newly saved custom schedule immediately
-      setAllFilmsData(prevFilms => prevFilms.map(film => 
-        film.id === selectedFilmId ? { ...film, schedule: [...editableSchedule] } : film
-      ));
-      // No need to call getSampleFilmsWithDynamicSchedules() here, as we are setting it directly
+      setAllFilmsData(prevFilms => {
+        if (!Array.isArray(prevFilms)) {
+          console.error("[ADMIN_PAGE] prevFilms in handleSaveCustomSchedule was not an array!", prevFilms);
+          // Attempt to recover by fetching fresh film data
+          getSampleFilmsWithDynamicSchedules().then(freshFilms => {
+             setAllFilmsData(Array.isArray(freshFilms) ? freshFilms.map(film => 
+                film.id === selectedFilmId ? { ...film, schedule: [...editableSchedule] } : film
+              ) : []);
+          }).catch(err => {
+            console.error("Error fetching fresh films during recovery in handleSaveCustomSchedule", err);
+            setAllFilmsData([]);
+          });
+          return []; // Or some sensible default while recovery happens
+        }
+        return prevFilms.map(film => 
+          film.id === selectedFilmId ? { ...film, schedule: [...editableSchedule] } : film
+        );
+      });
     }
   };
 
@@ -245,10 +276,15 @@ const FilmHallConfigPage: NextPage = () => {
     });
 
     if (result.success) {
-      const updatedFilms = getSampleFilmsWithDynamicSchedules(); 
-      setAllFilmsData(updatedFilms); 
-      const updatedSelectedFilm = updatedFilms.find(f => f.id === selectedFilmId);
-      setEditableSchedule(updatedSelectedFilm?.schedule || []);
+      getSampleFilmsWithDynamicSchedules().then(updatedFilms => { 
+        setAllFilmsData(Array.isArray(updatedFilms) ? updatedFilms : []);
+        const updatedSelectedFilmData = Array.isArray(updatedFilms) ? updatedFilms.find(f => f.id === selectedFilmId) : undefined;
+        setEditableSchedule(updatedSelectedFilmData?.schedule || []);
+      }).catch(error => {
+        console.error("[ADMIN_PAGE] Error re-fetching films after restoring default schedule:", error);
+        setAllFilmsData([]);
+        setEditableSchedule([]);
+      });
       console.log("[ADMIN_PAGE] Default schedule restored, re-fetched films.");
     }
   };
@@ -290,7 +326,7 @@ const FilmHallConfigPage: NextPage = () => {
                 <SelectValue placeholder="Choose a film..." />
               </SelectTrigger>
               <SelectContent>
-                {allFilmsData.map(film => (
+                {Array.isArray(allFilmsData) && allFilmsData.map(film => (
                   <SelectItem key={film.id} value={film.id} className="text-base py-2">
                     {film.title}
                   </SelectItem>
@@ -395,7 +431,6 @@ const FilmHallConfigPage: NextPage = () => {
                                     </h4>
                                     <ul className="space-y-1.5 pl-1">
                                         {entries.map((entry, idx) => {
-                                            // Find original index in the flat editableSchedule array for removal
                                             const originalIndex = editableSchedule.findIndex(
                                                 (e) => e.day === entry.day && e.time === entry.time && e.hallName === entry.hallName
                                             );
