@@ -6,7 +6,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { LayoutProvider, useLayoutContext } from '@/contexts/LayoutContext';
 import { LayoutPreview } from '@/components/LayoutPreview';
-import { getSampleFilmsWithDynamicSchedules, type Film } from '@/data/films'; // Updated import
+import { getSampleFilmsWithDynamicSchedules, type Film } from '@/data/films'; 
 import { sampleLayouts } from '@/data/sample-layouts';
 import type { HallLayout } from '@/types/layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -107,7 +107,6 @@ function FilmPageContent() {
   const dayFromQuery = searchParams.get('day');
   const timeFromQuery = searchParams.get('time');
 
-  // Use state to hold films to ensure client-side execution for localStorage access
   const [allFilms, setAllFilms] = useState<Film[]>([]);
   useEffect(() => {
     setAllFilms(getSampleFilmsWithDynamicSchedules());
@@ -123,19 +122,13 @@ function FilmPageContent() {
     let initialHallNameOverrideForInterface: string | null = hallNameFromQuery ? decodeURIComponent(hallNameFromQuery) : null;
 
     if (initialHallNameOverrideForInterface) {
-      // Try to find in samples first
       layoutToLoad = sampleLayouts.find(l => l.name === initialHallNameOverrideForInterface);
-      // If not a sample, initialHallNameOverrideForInterface will be used by FilmTicketBookingInterface to load from storage
     }
 
-    // If no hall from query, or if query hall was a sample (already set to layoutToLoad)
-    // or if query hall was not a sample (initialHallNameOverrideForInterface is set, layoutToLoad is undefined, which is fine)
-    // then, check for associated layout if no specific hall was effectively chosen for direct load.
     if (!layoutToLoad && !initialHallNameOverrideForInterface && currentFilm.associatedLayoutName) {
       layoutToLoad = sampleLayouts.find(l => l.name === currentFilm.associatedLayoutName);
     }
 
-    // Fallback to first sample layout if no specific hall from query and no associated layout
     if (!layoutToLoad && !initialHallNameOverrideForInterface) { 
       layoutToLoad = sampleLayouts.length > 0 ? sampleLayouts[0] : undefined;
     }
@@ -143,7 +136,7 @@ function FilmPageContent() {
     return { 
       film: currentFilm, 
       layoutToLoad: layoutToLoad, 
-      initialHallNameOverride: layoutToLoad ? null : initialHallNameOverrideForInterface // Pass override only if not found in samples
+      initialHallNameOverride: layoutToLoad ? null : initialHallNameOverrideForInterface 
     };
   }, [filmId, hallNameFromQuery, allFilms, sampleLayouts]); 
 
@@ -153,7 +146,7 @@ function FilmPageContent() {
     return <div className="text-center py-20 text-xl text-destructive-foreground">Film ID is missing.</div>;
   }
   
-  if (allFilms.length === 0) { // Still fetching films
+  if (allFilms.length === 0) {
      return (
         <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-4">
             <TicketIconLucide className="w-16 h-16 text-primary mb-4 animate-bounce" />
@@ -208,4 +201,3 @@ export default function FilmPage() {
     </Suspense>
   );
 }
-
