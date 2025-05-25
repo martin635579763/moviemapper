@@ -14,7 +14,11 @@ export default function HomePage() {
   const { isManager, loginManager, logoutManager } = useAuthContext();
 
   useEffect(() => {
-    setFilmsToDisplay(getSampleFilmsWithDynamicSchedules());
+    const fetchFilms = async () => {
+      const films = await getSampleFilmsWithDynamicSchedules();
+      setFilmsToDisplay(films);
+    };
+    fetchFilms();
   }, []);
 
 

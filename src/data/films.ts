@@ -1,7 +1,7 @@
 
 import type { HallLayout } from '@/types/layout';
 import type { FilmHallPreferences, UserDefinedFilmSchedules } from '@/types/schedule';
-import { getStoredLayoutNamesService } from '@/services/layoutStorageService';
+import { getStoredLayoutNamesService } from '@/services/layoutStorageService'; // Now async
 import { 
   getAllFilmHallPreferencesService, 
   getAllUserDefinedFilmSchedulesService 
@@ -43,6 +43,7 @@ const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
     associatedLayoutName: 'Small Hall',
     duration: "2h 15m",
     genre: "Adventure, Fantasy",
+
   },
   {
     id: '3',
@@ -52,6 +53,7 @@ const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
     associatedLayoutName: 'Special VIP Hall',
     duration: "2h 10m",
     genre: "Drama, Romance",
+
   },
   {
     id: '4',
@@ -77,31 +79,27 @@ export const POSSIBLE_TIMES_FOR_GENERATION = ["2:00 PM", "2:30 PM", "4:30 PM", "
 export const DAYS_FOR_GENERATION = ["Today", "Tomorrow", "Next Day"];
 
 
-export function getSampleFilmsWithDynamicSchedules(): Film[] {
+export async function getSampleFilmsWithDynamicSchedules(): Promise<Film[]> {
   let storedLayoutNames: string[] = [];
   let filmHallPrefs: FilmHallPreferences = {};
   let userDefinedSchedules: UserDefinedFilmSchedules = {};
 
+  // Check if running in a browser environment before accessing localStorage
   if (typeof window !== 'undefined' && window.localStorage) {
     // Fetch data using services
-    storedLayoutNames = getStoredLayoutNamesService();
+    // getStoredLayoutNamesService is now async
+    storedLayoutNames = await getStoredLayoutNamesService(); 
     filmHallPrefs = getAllFilmHallPreferencesService();
     userDefinedSchedules = getAllUserDefinedFilmSchedulesService();
-    
-    // console.log("[films.ts] Loaded storedLayoutNames for dynamic generation:", storedLayoutNames);
-    // console.log("[films.ts] Loaded filmHallPrefs:", filmHallPrefs);
-    // console.log("[films.ts] Loaded userDefinedSchedules:", userDefinedSchedules);
   }
   
   const currentlySavedAndValidHalls = new Set(storedLayoutNames);
-  // console.log("[films.ts] currentlySavedAndValidHalls for dynamic generation:", currentlySavedAndValidHalls);
 
   return BASE_FILM_DATA.map(baseFilm => {
     const userScheduleForFilm = userDefinedSchedules[baseFilm.id];
     
     if (userScheduleForFilm && Array.isArray(userScheduleForFilm)) {
       const validUserSchedule = userScheduleForFilm.filter(entry => currentlySavedAndValidHalls.has(entry.hallName));
-      // console.log(`[films.ts] Film '${baseFilm.title}': Using user-defined schedule. Original: ${userScheduleForFilm.length}, Valid: ${validUserSchedule.length}`);
       validUserSchedule.sort((a, b) => {
         if (a.day !== b.day) return DAYS_FOR_GENERATION.indexOf(a.day) - DAYS_FOR_GENERATION.indexOf(b.day);
         const timeA = POSSIBLE_TIMES_FOR_GENERATION.indexOf(a.time);
@@ -121,10 +119,8 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
 
     if (filmSpecificPreferences && filmSpecificPreferences.length > 0) {
       hallsToUseForThisFilmDynamic = filmSpecificPreferences.filter(hallName => currentlySavedAndValidHalls.has(hallName));
-      // console.log(`[films.ts] Film '${baseFilm.title}': Using PREFERRED halls for dynamic. Preferred: ${filmSpecificPreferences.join(', ')}, Valid subset: ${hallsToUseForThisFilmDynamic.join(', ')}`);
     } else {
-      hallsToUseForThisFilmDynamic = [...currentlySavedAndValidHalls]; // Use all currently saved and valid halls
-      // console.log(`[films.ts] Film '${baseFilm.title}': Using ALL SAVED halls for dynamic. Count: ${hallsToUseForThisFilmDynamic.length}`);
+      hallsToUseForThisFilmDynamic = [...currentlySavedAndValidHalls]; 
     }
     
     if (hallsToUseForThisFilmDynamic.length > 0) {
@@ -154,7 +150,6 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
         }
       });
     }
-    // console.log(`[films.ts] Film '${baseFilm.title}': Generated dynamic schedule. Count: ${dynamicSchedule.length}`);
 
     dynamicSchedule.sort((a, b) => {
       if (a.day !== b.day) return DAYS_FOR_GENERATION.indexOf(a.day) - DAYS_FOR_GENERATION.indexOf(b.day);
@@ -169,4 +164,21 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
       schedule: dynamicSchedule,
     };
   });
+}
+
+// Keep this synchronous version for cases where an immediate (potentially stale) list is needed
+// OR if the calling context can't be async. However, this is generally not ideal
+// if layout names are fetched asynchronously from an API.
+// For now, components will be updated to use the async version.
+export function getSampleFilmsWithSchedules_SYNC_DEPRECATED_DO_NOT_USE(): Film[] {
+  let storedLayoutNames: string[] = [];
+  if (typeof window !== 'undefined' && window.localStorage) {
+     // This is problematic because getStoredLayoutNamesService is async.
+     // This function version is kept only to show the original structure but should not be used
+     // if getStoredLayoutNamesService is truly async.
+     // storedLayoutNames = getStoredLayoutNamesService(); // This line would be incorrect if it's async
+     console.warn("getSampleFilmsWithSchedules_SYNC_DEPRECATED_DO_NOT_USE is called. This might use stale layout data if getStoredLayoutNamesService is async.")
+  }
+  // ... rest of the logic would be similar but using potentially stale 'storedLayoutNames'
+  return BASE_FILM_DATA.map(f => ({...f, schedule: []})); // Placeholder
 }

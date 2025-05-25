@@ -23,19 +23,22 @@ interface FilmTicketBookingInterfaceProps {
 }
 
 const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({ film, initialLayout, initialHallNameOverride, selectedDay, selectedTime }) => {
-  const { layout, loadLayout, loadLayoutFromStorage } = useLayoutContext();
+  const { layout, loadLayout, loadLayoutFromStorage, isLoadingLayouts } = useLayoutContext();
   
   useEffect(() => {
-    if (initialHallNameOverride) {
-      const sampleOverride = sampleLayouts.find(l => l.name === initialHallNameOverride);
-      if (sampleOverride) {
-        loadLayout(JSON.parse(JSON.stringify(sampleOverride)));
-      } else {
-        loadLayoutFromStorage(initialHallNameOverride);
+    const loadInitial = async () => {
+      if (initialHallNameOverride) {
+        const sampleOverride = sampleLayouts.find(l => l.name === initialHallNameOverride);
+        if (sampleOverride) {
+          await loadLayout(JSON.parse(JSON.stringify(sampleOverride)));
+        } else {
+          await loadLayoutFromStorage(initialHallNameOverride);
+        }
+      } else if (initialLayout) {
+         await loadLayout(JSON.parse(JSON.stringify(initialLayout))); 
       }
-    } else if (initialLayout) {
-       loadLayout(JSON.parse(JSON.stringify(initialLayout))); 
-    }
+    };
+    loadInitial();
   }, [initialLayout, initialHallNameOverride, loadLayout, loadLayoutFromStorage, sampleLayouts]);
 
   return (
@@ -82,6 +85,7 @@ const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({
               <p><strong>Date & Time:</strong> {selectedDay}, {selectedTime}</p>
             )}
             {layout && <p><strong>Hall:</strong> {layout.name}</p>}
+             {isLoadingLayouts && <p className="text-sm text-muted-foreground">Loading hall details...</p>}
           </CardContent>
         </Card>
         
@@ -108,8 +112,13 @@ function FilmPageContent() {
   const timeFromQuery = searchParams.get('time');
 
   const [allFilms, setAllFilms] = useState<Film[]>([]);
+  
   useEffect(() => {
-    setAllFilms(getSampleFilmsWithDynamicSchedules());
+    const loadFilms = async () => {
+      const films = await getSampleFilmsWithDynamicSchedules();
+      setAllFilms(films);
+    };
+    loadFilms();
   }, []);
   
   const filmData = useMemo(() => {
@@ -130,12 +139,15 @@ function FilmPageContent() {
     }
 
     if (!layoutToLoad && !initialHallNameOverrideForInterface) { 
+      // Fallback to first sample layout if no specific layout is determined
+      // This might not be ideal if no sample layouts exist or if a stored layout should be the default
       layoutToLoad = sampleLayouts.length > 0 ? sampleLayouts[0] : undefined;
     }
     
     return { 
       film: currentFilm, 
       layoutToLoad: layoutToLoad, 
+      // Pass the hall name from query if it's for a stored layout (not found in samples)
       initialHallNameOverride: layoutToLoad ? null : initialHallNameOverrideForInterface 
     };
   }, [filmId, hallNameFromQuery, allFilms, sampleLayouts]); 
@@ -170,10 +182,13 @@ function FilmPageContent() {
     );
   }
   
+  // If layoutToLoad is determined (e.g. from associatedLayoutName or query param matching a sample), use it.
+  // Otherwise, initialHallNameOverride will be used (which means it's a stored layout name).
   const finalInitialLayoutProp = layoutToLoad;
 
+
   return (
-    <LayoutProvider key={`${filmId}-${hallNameFromQuery || film.associatedLayoutName || 'defaultHall'}-${dayFromQuery}-${timeFromQuery}`}> 
+    <LayoutProvider key={`${filmId}-${hallNameFromQuery || film.associatedLayoutName || 'defaultLayoutContextKey'}-${dayFromQuery}-${timeFromQuery}`}> 
        <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 text-foreground">
         <div className="p-4 md:p-6 sticky top-0 bg-background/80 backdrop-blur-md z-50 shadow-sm">
             <Button asChild variant="ghost" size="sm">
@@ -184,8 +199,8 @@ function FilmPageContent() {
         </div>
         <FilmTicketBookingInterface 
           film={film} 
-          initialLayout={finalInitialLayoutProp} 
-          initialHallNameOverride={initialHallNameOverride}
+          initialLayout={finalInitialLayoutProp} // This can be undefined if initialHallNameOverride is set
+          initialHallNameOverride={initialHallNameOverride} // This is used if initialLayout is undefined
           selectedDay={dayFromQuery ? decodeURIComponent(dayFromQuery) : null}
           selectedTime={timeFromQuery ? decodeURIComponent(timeFromQuery) : null}
         />

@@ -52,8 +52,8 @@ export const AppToolbar: React.FC = () => {
     loadLayout, exportLayout,
     saveLayoutToStorage, loadLayoutFromStorage,
     deleteStoredLayout,
-    storedLayoutNames,
-    refreshStoredLayoutNames,
+    storedLayoutNames, // from context, now async-populated
+    refreshStoredLayoutNames, // from context, now async
   } = useLayoutContext();
 
   const [rows, setRows] = useState(layout.rows || DEFAULT_ROWS);
@@ -73,14 +73,20 @@ export const AppToolbar: React.FC = () => {
     setRows(layout.rows);
     setCols(layout.cols);
     setSaveLayoutNameInput(layout.name);
-  }, [layout]); // Depend on the entire layout object
+  }, [layout]); 
 
-  // Fetch film schedules when popover is open or storedLayoutNames change
   useEffect(() => {
-    if (isManagePopoverOpen && refreshStoredLayoutNames) { 
-        setFilmsWithSchedules(getSampleFilmsWithDynamicSchedules());
-    }
-  }, [isManagePopoverOpen, storedLayoutNames, refreshStoredLayoutNames]);
+    const fetchFilmData = async () => {
+      if (isManagePopoverOpen) { 
+        // Refreshing names before fetching films ensures we use the latest list.
+        // The context's storedLayoutNames will update, then this effect might re-run if storedLayoutNames is a dependency.
+        // await refreshStoredLayoutNames(); // Let context handle refresh on save/delete. UI button triggers manual refresh.
+        const films = await getSampleFilmsWithDynamicSchedules();
+        setFilmsWithSchedules(films);
+      }
+    };
+    fetchFilmData();
+  }, [isManagePopoverOpen, storedLayoutNames]); // storedLayoutNames from context will trigger re-fetch if changed
 
   const isHallInUse = useCallback((hallName: string): boolean => {
     return filmsWithSchedules.some(film =>
@@ -103,10 +109,10 @@ export const AppToolbar: React.FC = () => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const loadedLayoutData = JSON.parse(e.target?.result as string);
-          loadLayout(loadedLayoutData);
+          await loadLayout(loadedLayoutData); // loadLayout is async now
         } catch (error) {
           console.error("Failed to parse layout file:", error);
         }
@@ -115,14 +121,14 @@ export const AppToolbar: React.FC = () => {
     }
   };
 
-  const handleSaveToStorage = () => {
+  const handleSaveToStorage = async () => {
     const trimmedSaveName = saveLayoutNameInput.trim();
-    saveLayoutToStorage(trimmedSaveName);
+    await saveLayoutToStorage(trimmedSaveName); // saveLayoutToStorage is async now
   };
 
-  const handleDeleteStoredLayout = () => {
+  const handleDeleteStoredLayout = async () => {
     if (layoutToDelete) {
-      deleteStoredLayout(layoutToDelete);
+      await deleteStoredLayout(layoutToDelete); // deleteStoredLayout is async now
       setLayoutToDelete(null);
     }
   };
@@ -218,9 +224,9 @@ export const AppToolbar: React.FC = () => {
         </div>
 
         {storedLayoutNames.length > 0 && (
-             <Select onValueChange={(value) => {
+             <Select onValueChange={async (value) => { // Make async
                 if (value === "__manage__") return;
-                loadLayoutFromStorage(value);
+                await loadLayoutFromStorage(value); // loadLayoutFromStorage is async
               }}>
               <SelectTrigger className="w-[160px] h-9 text-xs">
                 <SelectValue placeholder="Load from Browser" />
@@ -234,17 +240,17 @@ export const AppToolbar: React.FC = () => {
         )}
          <Tooltip>
           <TooltipTrigger asChild>
-             <Button variant="outline" size="icon" className="h-9 w-9" onClick={refreshStoredLayoutNames}><ListRestart className="h-4 w-4"/></Button>
+             <Button variant="outline" size="icon" className="h-9 w-9" onClick={async () => await refreshStoredLayoutNames()}><ListRestart className="h-4 w-4"/></Button>
           </TooltipTrigger>
           <TooltipContent><p>Refresh saved layouts list</p></TooltipContent>
         </Tooltip>
 
 
         {/* Sample Layouts */}
-         <Select onValueChange={(value) => {
+         <Select onValueChange={async (value) => { // Make async
             const selectedSample = sampleLayouts.find(sl => sl.name === value);
             if (selectedSample) {
-              loadLayout(JSON.parse(JSON.stringify(selectedSample)));
+              await loadLayout(JSON.parse(JSON.stringify(selectedSample))); // loadLayout is async
             }
           }}>
           <SelectTrigger className="w-[150px] h-9 text-xs">
@@ -313,9 +319,9 @@ export const AppToolbar: React.FC = () => {
                               variant="outline"
                               size="sm"
                               className="text-primary hover:bg-primary/10 h-7 px-2"
-                              onClick={(e) => {
+                              onClick={async (e) => { // make async
                                 e.stopPropagation(); 
-                                loadLayoutFromStorage(name);
+                                await loadLayoutFromStorage(name); // loadLayoutFromStorage is async
                                 setIsManagePopoverOpen(false);
                               }}
                             >
@@ -396,13 +402,17 @@ const CommandGroup: React.FC<CommandGroupProps> = ({ className, heading, ...prop
 );
 
 interface CommandItemProps extends React.HTMLAttributes<HTMLDivElement> {
-  onSelect?: (value: string) => void; // Assuming onSelect might take a value, adjust if not
-  value?: string; // Assuming CommandItem might have a value, adjust if not
+  onSelect?: (value: string) => void; 
+  value?: string; 
 }
 const CommandItem: React.FC<CommandItemProps> = ({ className, onSelect, value, ...props }) => (
   <div
     className={cn("relative flex cursor-default select-none items-center rounded-sm text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)}
-    onClick={() => onSelect && value && onSelect(value)} 
+    onClick={() => {
+      if (onSelect && value) { // Ensure onSelect and value are defined before calling
+        onSelect(value);
+      }
+    }}
     {...props}
   />
 );
