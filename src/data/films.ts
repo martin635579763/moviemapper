@@ -12,14 +12,11 @@ export interface Film {
   title: string;
   description: string;
   posterUrl: string;
-  // detailImageUrls: string[]; // Removed
   associatedLayoutName: string;
   duration: string;
   genre: string;
   schedule?: ScheduleEntry[];
 }
-
-// Removed getDetailImageUnsplashUrl as it's no longer used
 
 const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
   {
@@ -35,7 +32,7 @@ const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
     id: '5',
     title: 'Chronicles of the Ancient Realm',
     description: 'An archaeologist deciphers an ancient prophecy predicting a celestial event, leading her on a perilous quest to find a mythical artifact before it falls into the wrong hands.',
-    posterUrl: 'https://image.tmdb.org/t/p/w500/x5q4e52c3g5s02s698txjGuF5wL.jpg',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg', // Changed to Inception poster
     associatedLayoutName: 'Small Hall',
     duration: "2h 15m",
     genre: "Adventure, Fantasy",
@@ -84,12 +81,15 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
       } else {
         storedLayoutNames = [];
       }
+      // console.log("[films.ts] Loaded storedLayoutNames:", storedLayoutNames);
 
       const prefsJson = localStorage.getItem(LOCAL_STORAGE_FILM_HALL_PREFERENCES_KEY);
       filmHallPrefs = prefsJson ? JSON.parse(prefsJson) : {};
+      // console.log("[films.ts] Loaded filmHallPrefs:", filmHallPrefs);
       
       const userSchedulesJson = localStorage.getItem(USER_DEFINED_FILM_SCHEDULES_KEY);
       userDefinedSchedules = userSchedulesJson ? JSON.parse(userSchedulesJson) : {};
+      // console.log("[films.ts] Loaded userDefinedSchedules:", userDefinedSchedules);
 
     } catch (e) {
       console.error("Error reading from localStorage in films.ts:", e);
@@ -99,12 +99,16 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
     }
   }
 
-  const globallyAvailableSavedHalls = new Set(storedLayoutNames);
+  // For dynamic schedule generation, ONLY use halls that are currently in localStorage.
+  const currentlySavedAndValidHalls = new Set(storedLayoutNames);
+  // console.log("[films.ts] currentlySavedAndValidHalls for dynamic generation:", currentlySavedAndValidHalls);
 
   return BASE_FILM_DATA.map(baseFilm => {
-    const userSchedule = userDefinedSchedules[baseFilm.id];
-    if (userSchedule && Array.isArray(userSchedule)) {
-      const validUserSchedule = userSchedule.filter(entry => globallyAvailableSavedHalls.has(entry.hallName));
+    const userScheduleForFilm = userDefinedSchedules[baseFilm.id];
+    if (userScheduleForFilm && Array.isArray(userScheduleForFilm)) {
+      // If a user-defined schedule exists, filter it to ensure halls are still valid
+      const validUserSchedule = userScheduleForFilm.filter(entry => currentlySavedAndValidHalls.has(entry.hallName));
+      // console.log(`[films.ts] Film '${baseFilm.title}': Using user-defined schedule. Original: ${userScheduleForFilm.length}, Valid: ${validUserSchedule.length}`);
        validUserSchedule.sort((a, b) => {
         if (a.day !== b.day) return DAYS_FOR_GENERATION.indexOf(a.day) - DAYS_FOR_GENERATION.indexOf(b.day);
         const timeA = POSSIBLE_TIMES_FOR_GENERATION.indexOf(a.time);
@@ -118,19 +122,22 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
       };
     }
 
+    // Fallback to dynamic schedule generation using preferences or all saved halls
     const dynamicSchedule: ScheduleEntry[] = [];
-    let hallsToUseForThisFilm: string[] = [];
+    let hallsToUseForThisFilmDynamic: string[] = [];
     const filmSpecificPreferences = filmHallPrefs[baseFilm.id];
 
     if (filmSpecificPreferences && filmSpecificPreferences.length > 0) {
-      hallsToUseForThisFilm = filmSpecificPreferences.filter(hallName => globallyAvailableSavedHalls.has(hallName));
+      hallsToUseForThisFilmDynamic = filmSpecificPreferences.filter(hallName => currentlySavedAndValidHalls.has(hallName));
+      // console.log(`[films.ts] Film '${baseFilm.title}': Using PREFERRED halls for dynamic. Preferred: ${filmSpecificPreferences.join(', ')}, Valid subset: ${hallsToUseForThisFilmDynamic.join(', ')}`);
     } else {
-      hallsToUseForThisFilm = [...globallyAvailableSavedHalls];
+      hallsToUseForThisFilmDynamic = [...currentlySavedAndValidHalls];
+      // console.log(`[films.ts] Film '${baseFilm.title}': Using ALL SAVED halls for dynamic. Count: ${hallsToUseForThisFilmDynamic.length}`);
     }
     
-    if (hallsToUseForThisFilm.length > 0) {
+    if (hallsToUseForThisFilmDynamic.length > 0) {
       DAYS_FOR_GENERATION.forEach(day => {
-        const shuffledHallsForDay = [...hallsToUseForThisFilm].sort(() => 0.5 - Math.random());
+        const shuffledHallsForDay = [...hallsToUseForThisFilmDynamic].sort(() => 0.5 - Math.random());
         const numHallsToShowPerDay = Math.min(shuffledHallsForDay.length, 2); 
 
         for (let i = 0; i < numHallsToShowPerDay; i++) {
@@ -155,6 +162,7 @@ export function getSampleFilmsWithDynamicSchedules(): Film[] {
         }
       });
     }
+    // console.log(`[films.ts] Film '${baseFilm.title}': Generated dynamic schedule. Count: ${dynamicSchedule.length}`);
 
     dynamicSchedule.sort((a, b) => {
       if (a.day !== b.day) return DAYS_FOR_GENERATION.indexOf(a.day) - DAYS_FOR_GENERATION.indexOf(b.day);
