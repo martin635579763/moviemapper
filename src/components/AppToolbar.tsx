@@ -24,7 +24,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"; 
-
+import { getSampleFilmsWithDynamicSchedules, type Film } from '@/data/films'; // Added
+import { Badge } from "@/components/ui/badge"; // Added
 
 const TOOLBAR_TOOLS_CONFIG: { value: EditorTool; label: string; icon: React.ElementType }[] = [
   { value: 'select', label: 'Select', icon: MousePointer },
@@ -51,9 +52,8 @@ export const AppToolbar: React.FC = () => {
     loadLayout, exportLayout,
     saveLayoutToStorage, loadLayoutFromStorage, 
     deleteStoredLayout,
-    storedLayoutNames, // Consume reactive list from context
-    refreshStoredLayoutNames, // Consume refresher from context
-    clearSeatSelection 
+    storedLayoutNames, 
+    refreshStoredLayoutNames, 
   } = useLayoutContext();
 
   const [rows, setRows] = useState(layout.rows || DEFAULT_ROWS);
@@ -61,6 +61,9 @@ export const AppToolbar: React.FC = () => {
   const [layoutName, setLayoutName] = useState(layout.name || "New Hall");
   const [saveLayoutNameInput, setSaveLayoutNameInput] = useState("");
   const [layoutToDelete, setLayoutToDelete] = useState<string | null>(null);
+  
+  const [filmsWithSchedules, setFilmsWithSchedules] = useState<Film[]>([]); // Added
+  const [isManagePopoverOpen, setIsManagePopoverOpen] = useState(false); // Added
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,11 +75,22 @@ export const AppToolbar: React.FC = () => {
     setSaveLayoutNameInput(layout.name); 
   }, [layout.name, layout.rows, layout.cols]);
 
-  // Removed local storedLayoutNames state and its refresh logic, now using context's
+  // Fetch film schedules when popover is open or storedLayoutNames change
+  useEffect(() => {
+    if (isManagePopoverOpen) {
+        setFilmsWithSchedules(getSampleFilmsWithDynamicSchedules());
+    }
+  }, [isManagePopoverOpen, storedLayoutNames]);
+
+  const isHallInUse = useCallback((hallName: string): boolean => {
+    return filmsWithSchedules.some(film =>
+        film.schedule?.some(entry => entry.hallName === hallName)
+    );
+  }, [filmsWithSchedules]);
+
 
   const handleInitialize = () => {
     initializeLayout(rows, cols, layoutName);
-    if (typeof clearSeatSelection === 'function') clearSeatSelection();
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,7 +107,6 @@ export const AppToolbar: React.FC = () => {
         try {
           const loadedLayoutData = JSON.parse(e.target?.result as string);
           loadLayout(loadedLayoutData); 
-          if (typeof clearSeatSelection === 'function') clearSeatSelection();
         } catch (error) {
           console.error("Failed to parse layout file:", error);
         }
@@ -111,7 +124,6 @@ export const AppToolbar: React.FC = () => {
   const handleDeleteStoredLayout = () => {
     if (layoutToDelete) {
       deleteStoredLayout(layoutToDelete);
-      // refreshStoredLayoutNames(); // Context handles refreshing
       setLayoutToDelete(null);
     }
   };
@@ -210,7 +222,6 @@ export const AppToolbar: React.FC = () => {
              <Select onValueChange={(value) => {
                 if (value === "__manage__") return;
                 loadLayoutFromStorage(value);
-                if (typeof clearSeatSelection === 'function') clearSeatSelection();
               }}>
               <SelectTrigger className="w-[160px] h-9 text-xs">
                 <SelectValue placeholder="Load from Browser" />
@@ -235,7 +246,6 @@ export const AppToolbar: React.FC = () => {
             const selectedSample = sampleLayouts.find(sl => sl.name === value);
             if (selectedSample) {
               loadLayout(JSON.parse(JSON.stringify(selectedSample))); 
-              if (typeof clearSeatSelection === 'function') clearSeatSelection();
             }
           }}>
           <SelectTrigger className="w-[150px] h-9 text-xs">
@@ -278,7 +288,7 @@ export const AppToolbar: React.FC = () => {
       </div>
       
       {storedLayoutNames.length > 0 && (
-        <Popover>
+        <Popover open={isManagePopoverOpen} onOpenChange={setIsManagePopoverOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="h-9 text-xs mt-2 ml-3">Manage Saved</Button>
           </PopoverTrigger>
@@ -289,9 +299,26 @@ export const AppToolbar: React.FC = () => {
                   <CommandEmpty>No results found.</CommandEmpty>
                   <CommandGroup heading="Saved Layouts">
                     {storedLayoutNames.map((name) => (
-                      <CommandItem key={name} onSelect={() => setLayoutToDelete(name)} className="flex justify-between items-center">
-                        <span>{name}</span>
-                        <Button variant="ghost" size="sm" onClick={() => setLayoutToDelete(name)}>Delete</Button>
+                      <CommandItem key={name} className="flex justify-between items-center pr-2">
+                        <div className="flex items-center gap-2 py-1.5 px-2">
+                            <span>{name}</span>
+                            {isHallInUse(name) ? (
+                                <Badge variant="default" className="h-5 px-1.5 text-xs bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600">In Use</Badge>
+                            ) : (
+                                <Badge variant="secondary" className="h-5 px-1.5 text-xs">Not in Use</Badge>
+                            )}
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
+                            onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setLayoutToDelete(name); 
+                            }}
+                        >
+                            Delete
+                        </Button>
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -318,14 +345,14 @@ export const AppToolbar: React.FC = () => {
   );
 };
 
-// ShadCN Command components
+// ShadCN Command components (These were previously defined inline. Keeping them for completeness)
 const Command: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, ...props }) => (
   <div className={cn("flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground", className)} {...props} />
 );
-const CommandInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = ({ className, ...props }) => (
+const CommandInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & {type?: string}> = ({ className, type, ...props }) => (
   <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-    <Input className={cn("flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 focus-visible:ring-0 focus-visible:ring-offset-0", className)} {...props} />
+    <input type={type} className={cn("flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 focus-visible:ring-0 focus-visible:ring-offset-0", className)} {...props} />
   </div>
 );
 
@@ -343,7 +370,10 @@ const CommandGroup: React.FC<React.HTMLAttributes<HTMLDivElement> & { heading?: 
 );
 const CommandItem: React.FC<React.HTMLAttributes<HTMLDivElement> & { onSelect?: () => void }> = ({ className, onSelect, ...props }) => (
   <div
-    className={cn("relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)}
+    className={cn("relative flex cursor-default select-none items-center rounded-sm text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)}
+    // onSelect is not directly used here as clicks are handled by the inner button. 
+    // However, Radix Command might use it for keyboard navigation.
+    // For explicit control, we removed onSelect that directly called setLayoutToDelete to avoid double calls.
     onClick={onSelect} 
     {...props}
   />
