@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { HallLayout, CellData, EditorTool, SeatCategory, PreviewMode, LayoutContextType, SeatStatus } from '@/types/layout';
-import { createDefaultLayout } from '@/lib/layout-utils';
+import { createDefaultLayout, calculatePreviewStates } from '@/lib/layout-utils';
 import { useToast } from "@/hooks/use-toast";
 
 const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
@@ -123,14 +123,13 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
           if (newCell.type === 'seat' && !newCell.status) {
             newCell.status = 'available' as SeatStatus;
           }
-          // Remove transient preview properties if they exist
           delete (newCell as any).isOccluded;
           delete (newCell as any).hasGoodView;
           return newCell;
         }))
       };
       setLayout(processedLayout);
-      setSelectedSeatsForPurchase([]); 
+      setSelectedSeatsForPurchase([]);
       toast({ title: "Success", description: `Layout "${processedLayout.name}" loaded.` });
     } catch (error: any) {
       console.error("Failed to load layout:", error);
@@ -139,14 +138,16 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
   }, [toast]);
 
   const exportLayout = useCallback(() => {
-    const layoutToExport = { ...layout };
-    layoutToExport.grid = layoutToExport.grid.map(row => row.map(cell => {
-        const { isOccluded, hasGoodView, ...restOfCell } = cell as CellData & {isOccluded?: boolean, hasGoodView?:boolean}; 
-        if (restOfCell.type === 'seat' && restOfCell.status === 'selected') {
-          return { ...restOfCell, status: 'available' as SeatStatus };
-        }
-        return restOfCell;
-    }));
+    const layoutToExport: HallLayout = { 
+        ...layout,
+        grid: layout.grid.map(row => row.map(cell => {
+            const { isOccluded, hasGoodView, ...restOfCell } = cell as CellData & {isOccluded?: boolean, hasGoodView?:boolean}; 
+            if (restOfCell.type === 'seat' && restOfCell.status === 'selected') {
+              return { ...restOfCell, status: 'available' as SeatStatus };
+            }
+            return restOfCell;
+        }))
+    };
 
     const jsonString = JSON.stringify(layoutToExport, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
@@ -173,21 +174,23 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const saveLayoutToStorage = useCallback((rawSaveName: string): boolean => {
+ const saveLayoutToStorage = useCallback((rawSaveName: string): boolean => {
     if (typeof window === 'undefined') {
       toast({ variant: "destructive", title: "Error", description: "Cannot save, window not available." });
       return false;
     }
-    const saveName = rawSaveName.trim(); 
+    const trimmedSaveName = rawSaveName.trim(); 
+    console.log("[SAVE_LAYOUT] Attempting to save with name:", `'${trimmedSaveName}'`);
 
-    if (!saveName) {
+    if (!trimmedSaveName) {
       toast({ variant: "destructive", title: "Error", description: "Layout name cannot be empty." });
+      console.log("[SAVE_LAYOUT] Save failed: Name is empty.");
       return false;
     }
     
     const layoutToSave: HallLayout = {
       ...layout,
-      name: saveName, 
+      name: trimmedSaveName, 
       grid: layout.grid.map(row => row.map(cell => {
         const { isOccluded, hasGoodView, ...restOfCell } = cell as CellData & {isOccluded?: boolean, hasGoodView?:boolean};
         if (restOfCell.type === 'seat' && restOfCell.status === 'selected') {
@@ -199,61 +202,71 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const currentStoredNames = getStoredLayoutNames();
-      const saveNameLower = saveName.toLowerCase();
-      let insensitiveMatchOriginalCase: string | undefined = undefined;
+      console.log("[SAVE_LAYOUT] Current stored names in localStorage:", currentStoredNames);
 
-      for (const storedName of currentStoredNames) {
-        if (storedName.toLowerCase() === saveNameLower) {
-          insensitiveMatchOriginalCase = storedName;
-          break;
-        }
-      }
+      const insensitiveMatchOriginalCase = currentStoredNames.find(
+        storedName => storedName.toLowerCase() === trimmedSaveName.toLowerCase()
+      );
+      console.log("[SAVE_LAYOUT] Found existing (case-insensitive):", insensitiveMatchOriginalCase);
 
       if (insensitiveMatchOriginalCase) {
-        // Name exists, potentially with different casing. Confirm overwrite.
+        console.log("[SAVE_LAYOUT] Existing name found. Preparing to call confirm().");
         const confirmed = confirm(
-          `Layout "${insensitiveMatchOriginalCase}" already exists. Overwrite with current edits and save as "${saveName}"?`
+          `Layout "${insensitiveMatchOriginalCase}" already exists. Overwrite with current edits and save as "${trimmedSaveName}"?`
         );
+        console.log("[SAVE_LAYOUT] confirm() returned:", confirmed); 
+
         if (!confirmed) {
           toast({ title: "Save Cancelled", description: `Overwrite of layout "${insensitiveMatchOriginalCase}" was cancelled by the user.`, variant: "default" });
+          console.log("[SAVE_LAYOUT] Overwrite cancelled by user.");
           return false;
         }
 
-        // Proceed with overwrite
+        console.log("[SAVE_LAYOUT] Overwrite confirmed by user. Proceeding to update.");
+        // Remove all case-insensitive matches of the original name before saving the new one
         let updatedNames = currentStoredNames.filter(
-          name => name.toLowerCase() !== insensitiveMatchOriginalCase!.toLowerCase()
+          name => name.toLowerCase() !== insensitiveMatchOriginalCase.toLowerCase()
         );
-        // Remove old items from storage that match insensitively
         currentStoredNames.forEach(storedName => {
-            if (storedName.toLowerCase() === insensitiveMatchOriginalCase!.toLowerCase()) {
+            if (storedName.toLowerCase() === insensitiveMatchOriginalCase.toLowerCase()) {
+                console.log(`[SAVE_LAYOUT] Removing old item from localStorage: ${LOCAL_STORAGE_LAYOUT_PREFIX + storedName}`);
                 localStorage.removeItem(LOCAL_STORAGE_LAYOUT_PREFIX + storedName);
             }
         });
         
-        updatedNames.push(saveName); // Add the new name (could be different casing)
-        localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + saveName, JSON.stringify(layoutToSave));
-        localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(updatedNames.sort()));
+        updatedNames.push(trimmedSaveName); // Add the new name (could be different casing)
+        updatedNames.sort();
+
+        console.log(`[SAVE_LAYOUT] Saving updated layout as: ${LOCAL_STORAGE_LAYOUT_PREFIX + trimmedSaveName}`);
+        localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + trimmedSaveName, JSON.stringify(layoutToSave));
+        console.log(`[SAVE_LAYOUT] Updating index in localStorage with names:`, updatedNames);
+        localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(updatedNames));
         
-        setLayout(layoutToSave);
+        setLayout(layoutToSave); 
         refreshStoredLayoutNames();
-        toast({ title: "Success", description: `Layout "${saveName}" updated in browser.` });
+        toast({ title: "Success", description: `Layout "${trimmedSaveName}" updated in browser.` });
+        console.log("[SAVE_LAYOUT] Layout updated successfully.");
         return true;
 
       } else {
         // Save as a new layout
-        let updatedNames = [...currentStoredNames];
-        updatedNames.push(saveName);
+        console.log("[SAVE_LAYOUT] No existing name found. Saving as new.");
+        let updatedNames = [...currentStoredNames, trimmedSaveName];
+        updatedNames.sort();
         
-        localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + saveName, JSON.stringify(layoutToSave));
-        localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(updatedNames.sort()));
+        console.log(`[SAVE_LAYOUT] Saving new layout as: ${LOCAL_STORAGE_LAYOUT_PREFIX + trimmedSaveName}`);
+        localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + trimmedSaveName, JSON.stringify(layoutToSave));
+        console.log(`[SAVE_LAYOUT] Updating index in localStorage with names:`, updatedNames);
+        localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(updatedNames));
 
-        setLayout(layoutToSave);
+        setLayout(layoutToSave); 
         refreshStoredLayoutNames();
-        toast({ title: "Success", description: `Layout "${saveName}" saved as new to browser.` });
+        toast({ title: "Success", description: `Layout "${trimmedSaveName}" saved as new to browser.` });
+        console.log("[SAVE_LAYOUT] Layout saved as new successfully.");
         return true;
       }
     } catch (e: any) {
-      console.error("Failed to save layout to localStorage:", e);
+      console.error("[SAVE_LAYOUT] Error during save operation:", e);
       toast({ variant: "destructive", title: "Error", description: `Could not save layout: ${e.message || 'Unknown error'}` });
       return false;
     }
@@ -266,7 +279,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       if (layoutJson) {
         const loadedLayout = JSON.parse(layoutJson) as HallLayout;
         loadLayout(loadedLayout); 
-        setSelectedSeatsForPurchase([]);
+        setSelectedSeatsForPurchase([]); 
       } else {
         toast({ variant: "destructive", title: "Error", description: `Layout "${layoutName}" not found in browser storage.` });
       }
@@ -281,7 +294,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     try {
       localStorage.removeItem(LOCAL_STORAGE_LAYOUT_PREFIX + layoutName);
       const currentStoredNames = getStoredLayoutNames();
-      localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(currentStoredNames.filter(name => name !== layoutName)));
+      localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(currentStoredNames.filter(name => name !== layoutName).sort()));
       refreshStoredLayoutNames();
       toast({ title: "Success", description: `Layout "${layoutName}" deleted from browser.` });
     } catch (e: any) {
@@ -353,3 +366,5 @@ export const useLayoutContext = () => {
   }
   return context;
 };
+
+    
