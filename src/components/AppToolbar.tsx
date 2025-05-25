@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { Settings, Upload, Download, MousePointer, Eraser, Sofa, Tv2, Footprints, SquarePlus, Save, ListRestart, Search } from 'lucide-react';
+import { Settings, Upload, Download, MousePointer, Eraser, Sofa, Tv2, Footprints, SquarePlus, Save, ListRestart, Search, Edit3 } from 'lucide-react';
 import { sampleLayouts } from '@/data/sample-layouts';
 import { DEFAULT_ROWS, DEFAULT_COLS } from '@/lib/layout-utils';
 import {
@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { cn } from "@/lib/utils"; 
+import { cn } from "@/lib/utils";
 import { getSampleFilmsWithDynamicSchedules, type Film } from '@/data/films';
 import { Badge } from "@/components/ui/badge";
 
@@ -50,10 +50,10 @@ export const AppToolbar: React.FC = () => {
     selectedSeatCategory, setSelectedSeatCategory,
     initializeLayout,
     loadLayout, exportLayout,
-    saveLayoutToStorage, loadLayoutFromStorage, 
+    saveLayoutToStorage, loadLayoutFromStorage,
     deleteStoredLayout,
-    storedLayoutNames, 
-    refreshStoredLayoutNames, 
+    storedLayoutNames,
+    refreshStoredLayoutNames,
   } = useLayoutContext();
 
   const [rows, setRows] = useState(layout.rows || DEFAULT_ROWS);
@@ -61,7 +61,7 @@ export const AppToolbar: React.FC = () => {
   const [layoutName, setLayoutName] = useState(layout.name || "New Hall");
   const [saveLayoutNameInput, setSaveLayoutNameInput] = useState("");
   const [layoutToDelete, setLayoutToDelete] = useState<string | null>(null);
-  
+
   const [filmsWithSchedules, setFilmsWithSchedules] = useState<Film[]>([]);
   const [isManagePopoverOpen, setIsManagePopoverOpen] = useState(false);
 
@@ -72,7 +72,7 @@ export const AppToolbar: React.FC = () => {
     setLayoutName(layout.name);
     setRows(layout.rows);
     setCols(layout.cols);
-    setSaveLayoutNameInput(layout.name); 
+    setSaveLayoutNameInput(layout.name);
   }, [layout.name, layout.rows, layout.cols]);
 
   // Fetch film schedules when popover is open or storedLayoutNames change
@@ -106,7 +106,7 @@ export const AppToolbar: React.FC = () => {
       reader.onload = (e) => {
         try {
           const loadedLayoutData = JSON.parse(e.target?.result as string);
-          loadLayout(loadedLayoutData); 
+          loadLayout(loadedLayoutData);
         } catch (error) {
           console.error("Failed to parse layout file:", error);
         }
@@ -160,7 +160,7 @@ export const AppToolbar: React.FC = () => {
             </Tooltip>
           ))}
         </div>
-        
+
         {selectedTool === 'seat' && (
           <Select value={selectedSeatCategory} onValueChange={(value: SeatCategory) => setSelectedSeatCategory(value)}>
             <SelectTrigger className="w-[130px] h-9 text-xs">
@@ -191,7 +191,7 @@ export const AppToolbar: React.FC = () => {
             <TooltipContent><p>Load layout from JSON file</p></TooltipContent>
         </Tooltip>
         <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" style={{ display: 'none' }} />
-        
+
         <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="outline" onClick={exportLayout} size="sm" className="h-9 text-xs"><Download className="mr-1.5 h-3.5 w-3.5" /> Export</Button>
@@ -200,13 +200,13 @@ export const AppToolbar: React.FC = () => {
         </Tooltip>
 
         <Separator orientation="vertical" className="h-7 mx-1" />
-        
+
         {/* Local Storage Actions */}
         <div className="flex items-center gap-2">
-            <Input 
-                type="text" 
-                placeholder="Save as name..." 
-                value={saveLayoutNameInput} 
+            <Input
+                type="text"
+                placeholder="Save as name..."
+                value={saveLayoutNameInput}
                 onChange={(e) => setSaveLayoutNameInput(e.target.value)}
                 className="w-[150px] h-9 text-xs"
             />
@@ -245,7 +245,7 @@ export const AppToolbar: React.FC = () => {
          <Select onValueChange={(value) => {
             const selectedSample = sampleLayouts.find(sl => sl.name === value);
             if (selectedSample) {
-              loadLayout(JSON.parse(JSON.stringify(selectedSample))); 
+              loadLayout(JSON.parse(JSON.stringify(selectedSample)));
             }
           }}>
           <SelectTrigger className="w-[150px] h-9 text-xs">
@@ -286,7 +286,7 @@ export const AppToolbar: React.FC = () => {
           </PopoverContent>
         </Popover>
       </div>
-      
+
       {storedLayoutNames.length > 0 && (
         <Popover open={isManagePopoverOpen} onOpenChange={setIsManagePopoverOpen}>
           <PopoverTrigger asChild>
@@ -308,18 +308,34 @@ export const AppToolbar: React.FC = () => {
                                 <Badge variant="secondary" className="h-5 px-1.5 text-xs">Not in Use</Badge>
                             )}
                         </div>
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
-                            onClick={(e) => { 
-                                e.stopPropagation(); 
-                                setLayoutToDelete(name); 
-                            }}
-                            disabled={isHallInUse(name)}
-                        >
-                            Delete
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          {!isHallInUse(name) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-primary hover:bg-primary/10 h-7 px-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                loadLayoutFromStorage(name);
+                                setIsManagePopoverOpen(false);
+                              }}
+                            >
+                              <Edit3 className="mr-1 h-3.5 w-3.5" /> Edit
+                            </Button>
+                          )}
+                          <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  setLayoutToDelete(name);
+                              }}
+                              disabled={isHallInUse(name)}
+                          >
+                              Delete
+                          </Button>
+                        </div>
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -346,7 +362,7 @@ export const AppToolbar: React.FC = () => {
   );
 };
 
-// ShadCN Command components (These were previously defined inline. Keeping them for completeness)
+// ShadCN Command components
 const Command: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, ...props }) => (
   <div className={cn("flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground", className)} {...props} />
 );
@@ -372,11 +388,7 @@ const CommandGroup: React.FC<React.HTMLAttributes<HTMLDivElement> & { heading?: 
 const CommandItem: React.FC<React.HTMLAttributes<HTMLDivElement> & { onSelect?: () => void }> = ({ className, onSelect, ...props }) => (
   <div
     className={cn("relative flex cursor-default select-none items-center rounded-sm text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)}
-    // onSelect is not directly used here as clicks are handled by the inner button. 
-    // However, Radix Command might use it for keyboard navigation.
-    // For explicit control, we removed onSelect that directly called setLayoutToDelete to avoid double calls.
-    onClick={onSelect} 
+    onClick={onSelect}
     {...props}
   />
 );
-
