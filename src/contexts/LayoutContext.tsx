@@ -33,13 +33,14 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       setCtxStoredLayoutNames(Array.isArray(names) ? [...names] : []);
     } catch (e) {
       console.error("Failed to parse stored layout names from localStorage:", e);
-      setCtxStoredLayoutNames([]); 
+      setCtxStoredLayoutNames([]);
     }
   }, []);
 
   useEffect(() => {
     refreshStoredLayoutNames();
   }, [refreshStoredLayoutNames]);
+
 
   const initializeLayout = useCallback((rows: number, cols: number, name?: string) => {
     const newLayout = createDefaultLayout(rows, cols, name);
@@ -52,16 +53,16 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       const newGrid = prevLayout.grid.map(r => r.map(c => ({ ...c })));
       const cell = newGrid[row][col];
       let newScreenCellIds = [...prevLayout.screenCellIds];
-      
+
       if (cell.type === 'screen' && selectedTool !== 'screen') {
         newScreenCellIds = newScreenCellIds.filter(id => id !== cell.id);
       }
-      
+
       switch (selectedTool) {
         case 'seat':
           cell.type = 'seat';
           cell.category = selectedSeatCategory;
-          cell.status = cell.status || 'available'; 
+          cell.status = cell.status || 'available';
           break;
         case 'aisle':
         case 'screen':
@@ -70,18 +71,18 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
           if (selectedTool === 'aisle') cell.type = 'aisle';
           else if (selectedTool === 'screen') cell.type = 'screen';
           else if (selectedTool === 'eraser') cell.type = 'empty';
-          
-          delete cell.category; 
-          if(cell.status !== 'sold') delete cell.status;
-          setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id)); 
-          
+
+          delete cell.category;
+          if (cell.status !== 'sold') delete cell.status; // Keep sold status if erasing
+          setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id));
+
           if (cell.type === 'screen' && !newScreenCellIds.includes(cell.id)) {
             newScreenCellIds.push(cell.id);
           } else if (oldType === 'screen' && cell.type !== 'screen') {
              newScreenCellIds = newScreenCellIds.filter(id => id !== cell.id);
           }
           break;
-        case 'select': 
+        case 'select':
           if (cell.type === 'seat') {
              if (cell.category !== selectedSeatCategory) {
                 cell.category = selectedSeatCategory;
@@ -93,7 +94,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       return { ...prevLayout, grid: newGrid, screenCellIds: newScreenCellIds };
     });
   }, [selectedTool, selectedSeatCategory]);
-  
+
   const clearSeatSelection = useCallback(() => {
     setLayout(prevLayout => ({
       ...prevLayout,
@@ -114,23 +115,23 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       }
       const processedLayout = {
         ...newLayoutData,
-        name: newLayoutData.name || 'Untitled Hall', 
+        name: newLayoutData.name || 'Untitled Hall',
         grid: newLayoutData.grid.map(row => row.map(cell => {
-          const newCell = {...cell}; 
-          if (newCell.type === 'seat' && !newCell.status) { 
+          const newCell = {...cell};
+          if (newCell.type === 'seat' && !newCell.status) {
             newCell.status = 'available' as SeatStatus;
           }
           return newCell;
         }))
       };
       setLayout(processedLayout);
-      setSelectedSeatsForPurchase([]); 
+      setSelectedSeatsForPurchase([]);
       toast({ title: "Success", description: `Layout "${processedLayout.name}" loaded.` });
     } catch (error: any) {
       console.error("Failed to load layout:", error);
       toast({ variant: "destructive", title: "Error", description: `Failed to load layout. ${error.message || 'Unknown error'}` });
     }
-  }, [toast]); 
+  }, [toast]);
 
   const exportLayout = () => {
     const layoutToExport = { ...layout };
@@ -172,28 +173,39 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "Error", description: "Cannot save, window not available." });
       return false;
     }
-    
-    const saveName = rawSaveName.trim(); // Trim the name upfront
 
-    if (!saveName) { // Check the trimmed name
+    const saveName = rawSaveName.trim();
+
+    if (!saveName) {
       toast({ variant: "destructive", title: "Error", description: "Layout name cannot be empty." });
       return false;
     }
 
     const currentStoredNames = getStoredLayoutNames();
-    // Check if the trimmed name already exists
-    if (currentStoredNames.includes(saveName)) {
-      // Ensure confirm dialog is actually interacted with
-      if (!confirm(`Layout "${saveName}" already exists. Overwrite?`)) {
-        toast({ title: "Save Cancelled", description: `Overwrite of layout "${saveName}" was cancelled.`, variant: "default" });
+    let existingNameFound: string | undefined = undefined;
+    const saveNameLower = saveName.toLowerCase();
+
+    for (const storedName of currentStoredNames) {
+      if (storedName.toLowerCase() === saveNameLower) {
+        existingNameFound = storedName; // Capture the name with its original casing
+        break;
+      }
+    }
+
+    if (existingNameFound) {
+      const confirmMessage = existingNameFound === saveName
+        ? `Layout "${existingNameFound}" already exists. Overwrite?`
+        : `Layout "${existingNameFound}" already exists (case-insensitive match). Overwrite and save as "${saveName}"?`;
+
+      if (!confirm(confirmMessage)) {
+        toast({ title: "Save Cancelled", description: `Overwrite of layout "${existingNameFound}" was cancelled by the user.`, variant: "default" });
         return false;
       }
     }
-    
-    // Use the trimmed saveName for the layout object and localStorage key
-    const layoutToSave: HallLayout = { 
-      ...layout, 
-      name: saveName,
+
+    const layoutToSave: HallLayout = {
+      ...layout,
+      name: saveName, // Ensure the layout's internal name is the new saveName
       grid: layout.grid.map(row => row.map(cell => {
         const { isOccluded, hasGoodView, ...restOfCell } = cell;
         if (restOfCell.type === 'seat' && restOfCell.status === 'selected') {
@@ -204,12 +216,23 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     };
 
     try {
-      localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + saveName, JSON.stringify(layoutToSave));
-      if (!currentStoredNames.includes(saveName)) { // Check with trimmed name again
-        localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify([...currentStoredNames, saveName]));
+      let updatedNames = [...currentStoredNames];
+      if (existingNameFound) {
+        // Remove the old name (with its original casing) if it's different from the new saveName or if it simply exists
+        updatedNames = updatedNames.filter(name => name !== existingNameFound);
+        localStorage.removeItem(LOCAL_STORAGE_LAYOUT_PREFIX + existingNameFound);
       }
-      setLayout(layoutToSave); // Update context with the exact saved state, including trimmed name
-      refreshStoredLayoutNames(); 
+      
+      // Add the new saveName (which could be new or the same as existingNameFound if casing matched)
+      if (!updatedNames.includes(saveName)) {
+          updatedNames.push(saveName);
+      }
+      
+      localStorage.setItem(LOCAL_STORAGE_LAYOUT_PREFIX + saveName, JSON.stringify(layoutToSave));
+      localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(updatedNames.sort())); // Keep index sorted
+
+      setLayout(layoutToSave);
+      refreshStoredLayoutNames();
       toast({ title: "Success", description: `Layout "${saveName}" saved to browser.` });
       return true;
     } catch (e: any) {
@@ -225,23 +248,24 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       const layoutJson = localStorage.getItem(LOCAL_STORAGE_LAYOUT_PREFIX + layoutName);
       if (layoutJson) {
         const loadedLayout = JSON.parse(layoutJson) as HallLayout;
-        loadLayout(loadedLayout); 
+        loadLayout(loadedLayout);
         setSelectedSeatsForPurchase([]);
       } else {
         toast({ variant: "destructive", title: "Error", description: `Layout "${layoutName}" not found in browser storage.` });
       }
     } catch (error: any) {
+      console.error("Failed to parse stored layout from localStorage:", error);
       toast({ variant: "destructive", title: "Error", description: `Failed to parse stored layout "${layoutName}". ${error.message || 'Unknown error'}` });
     }
   }, [loadLayout, toast]);
-  
+
   const deleteStoredLayout = useCallback((layoutName: string) => {
     if (typeof window === 'undefined') return;
     try {
       localStorage.removeItem(LOCAL_STORAGE_LAYOUT_PREFIX + layoutName);
-      const currentStoredNames = getStoredLayoutNames(); 
+      const currentStoredNames = getStoredLayoutNames();
       localStorage.setItem(LOCAL_STORAGE_INDEX_KEY, JSON.stringify(currentStoredNames.filter(name => name !== layoutName)));
-      refreshStoredLayoutNames(); 
+      refreshStoredLayoutNames();
       toast({ title: "Success", description: `Layout "${layoutName}" deleted from browser.` });
     } catch (e: any) {
       console.error("Failed to delete layout from localStorage:", e);
@@ -251,7 +275,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
 
   const toggleSeatSelection = useCallback((rowIndex: number, colIndex: number) => {
     setLayout(prevLayout => {
-      const newGrid = prevLayout.grid.map(r => r.map(c => ({...c}))); 
+      const newGrid = prevLayout.grid.map(r => r.map(c => ({...c})));
       const cell = newGrid[rowIndex][colIndex];
 
       if (cell.type !== 'seat' || cell.status === 'sold') return prevLayout;
@@ -296,8 +320,8 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       initializeLayout, updateCell,
       loadLayout, exportLayout,
       saveLayoutToStorage, loadLayoutFromStorage, deleteStoredLayout, getStoredLayoutNames,
-      storedLayoutNames: ctxStoredLayoutNames, 
-      refreshStoredLayoutNames, 
+      storedLayoutNames: ctxStoredLayoutNames,
+      refreshStoredLayoutNames,
       selectedSeatsForPurchase, toggleSeatSelection, confirmTicketPurchase, clearSeatSelection
     }}>
       {children}
@@ -312,4 +336,3 @@ export const useLayoutContext = () => {
   }
   return context;
 };
-    
