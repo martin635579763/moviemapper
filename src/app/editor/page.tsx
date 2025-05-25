@@ -3,13 +3,14 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { LayoutProvider } from '@/contexts/LayoutContext';
 import { AppToolbar } from '@/components/AppToolbar';
 import { LayoutEditor } from '@/components/LayoutEditor';
 import { LayoutPreview } from '@/components/LayoutPreview';
 import { Button } from '@/components/ui/button';
-import { LogOut, ShieldAlert } from 'lucide-react';
+import { LogOut, ShieldAlert, ArrowLeft } from 'lucide-react';
 
 export default function EditorPage() {
   const { isManager, logoutManager } = useAuthContext();
@@ -39,10 +40,17 @@ export default function EditorPage() {
     <LayoutProvider>
       <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
         <header className="p-3 border-b bg-card shadow-sm flex justify-between items-center sticky top-0 z-10">
-            <h1 className="text-lg font-semibold text-primary whitespace-nowrap">
-                Cinema Layout Editor
-            </h1>
-            {isManager && ( // Technically redundant due to the guard above, but good for explicit clarity
+            <div className="flex items-center gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/">
+                    <ArrowLeft className="mr-1.5 h-4 w-4" /> Back to Home
+                </Link>
+              </Button>
+              <h1 className="text-lg font-semibold text-primary whitespace-nowrap">
+                  Cinema Layout Editor
+              </h1>
+            </div>
+            {isManager && (
               <Button variant="outline" size="sm" onClick={logoutManager}>
                   <LogOut className="mr-1.5 h-4 w-4" /> Logout
               </Button>
