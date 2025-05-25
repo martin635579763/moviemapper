@@ -33,13 +33,13 @@ export interface LayoutContextType {
   setPreviewMode: React.Dispatch<React.SetStateAction<PreviewMode>>;
   initializeLayout: (rows: number, cols: number, name?: string) => void;
   updateCell: (row: number, col: number) => void;
-  loadLayout: (newLayout: HallLayout) => void;
+  loadLayout: (newLayout: HallLayout | null) => void;
   exportLayout: () => void;
 
   saveLayoutToStorage: (saveName: string) => boolean;
   loadLayoutFromStorage: (layoutName: string) => void;
   deleteStoredLayout: (layoutName: string) => void;
-  getStoredLayoutNames: () => string[]; // Direct localStorage reader
+  // getStoredLayoutNames: () => string[]; // This direct getter is no longer exposed
   
   // Reactive list of stored layout names and its refresher
   storedLayoutNames: string[]; 
