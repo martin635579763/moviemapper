@@ -16,9 +16,10 @@ export async function GET() {
     });
     const layoutNames = layouts.map(layout => layout.name);
     return NextResponse.json(layoutNames);
-  } catch (error) {
+  } catch (error: any) { // Added :any type for error to access message property
     console.error('API_GET_LAYOUT_NAMES_ERROR:', error);
-    return NextResponse.json({ message: 'Failed to fetch layout names' }, { status: 500 });
+    // Include the actual error message in the response
+    return NextResponse.json({ message: 'Failed to fetch layout names', error: error.message }, { status: 500 });
   }
 }
 
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
     if (error.code === 'P2002' && error.meta?.target?.includes('name')) {
          return NextResponse.json({ message: `Layout with name "${(error.meta?.values as any)?.name || 'provided'}" already exists.` }, { status: 409 });
     }
+    // Include the actual error message in the response
     return NextResponse.json({ message: 'Failed to create layout', error: error.message }, { status: 500 });
   }
 }
