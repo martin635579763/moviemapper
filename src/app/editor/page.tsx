@@ -10,28 +10,38 @@ import { AppToolbar } from '@/components/AppToolbar';
 import { LayoutEditor } from '@/components/LayoutEditor';
 import { LayoutPreview } from '@/components/LayoutPreview';
 import { Button } from '@/components/ui/button';
-import { LogOut, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { LogOut, ShieldAlert, ArrowLeft, Loader2 } from 'lucide-react';
 
 export default function EditorPage() {
-  const { isManager, logoutManager } = useAuthContext();
+  const { user, isManager, logout, loadingAuth } = useAuthContext();
   const router = useRouter();
 
   useEffect(() => {
-    // Check if running in browser and user is not a manager
-    if (typeof window !== "undefined" && !isManager) {
+    if (!loadingAuth && !isManager) {
       router.replace('/'); 
     }
-  }, [isManager, router]);
+  }, [isManager, loadingAuth, router]);
 
-  // This check ensures that if the effect hasn't run yet (e.g. initial render)
-  // or if isManager becomes false after initial load, content isn't shown.
+  if (loadingAuth) {
+    return (
+        <div className="flex flex-col items-center justify-center h-screen bg-background text-foreground p-8 text-center">
+            <Loader2 className="w-16 h-16 text-primary animate-spin mb-4" />
+            <h1 className="text-2xl font-semibold mb-2">Authenticating...</h1>
+        </div>
+    );
+  }
+
   if (!isManager) { 
     return (
         <div className="flex flex-col items-center justify-center h-screen bg-background text-foreground p-8 text-center">
             <ShieldAlert className="w-16 h-16 text-destructive mb-4" />
             <h1 className="text-2xl font-semibold mb-2">Access Denied</h1>
             <p className="text-muted-foreground mb-6">You must be logged in as a manager to access the layout editor.</p>
-            <p className="text-sm text-muted-foreground">Redirecting to homepage...</p>
+            <Button asChild variant="outline">
+                <Link href="/">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
+                </Link>
+            </Button>
         </div>
     );
   }
@@ -50,8 +60,8 @@ export default function EditorPage() {
                   Cinema Layout Editor
               </h1>
             </div>
-            {isManager && (
-              <Button variant="outline" size="sm" onClick={logoutManager}>
+            {user && ( // Logout only if user is logged in
+              <Button variant="outline" size="sm" onClick={logout}>
                   <LogOut className="mr-1.5 h-4 w-4" /> Logout
               </Button>
             )}

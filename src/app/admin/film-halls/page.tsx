@@ -14,7 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { ShieldAlert, ListVideo, Save, CalendarDays, Clock, Building2, Trash2, PlusCircle, RotateCcw, ArrowLeft } from 'lucide-react';
+import { ShieldAlert, ListVideo, Save, CalendarDays, Clock, Building2, Trash2, PlusCircle, RotateCcw, ArrowLeft, Loader2 } from 'lucide-react';
 import type { FilmHallPreferences, UserDefinedFilmSchedules } from '@/types/schedule';
 import { 
   getAllFilmHallPreferencesService, 
@@ -25,7 +25,7 @@ import {
 
 
 const FilmHallConfigPage: NextPage = () => {
-  const { isManager } = useAuthContext();
+  const { user, isManager, loadingAuth } = useAuthContext();
   const { storedLayoutNames, refreshStoredLayoutNames } = useLayoutContext(); 
   const { toast } = useToast();
   const router = useRouter();
@@ -42,13 +42,13 @@ const FilmHallConfigPage: NextPage = () => {
   const [newShowtimeHall, setNewShowtimeHall] = useState<string>(""); 
 
   useEffect(() => {
-    if (!isManager) {
+    if (!loadingAuth && !isManager) {
       router.replace('/');
     }
-  }, [isManager, router]);
+  }, [isManager, loadingAuth, router]);
   
   useEffect(() => {
-    if (isManager) {
+    if (!loadingAuth && isManager) {
       console.log("[ADMIN_PAGE_EFFECT] Manager detected. Fetching initial data.");
       refreshStoredLayoutNames(); 
       
@@ -76,12 +76,12 @@ const FilmHallConfigPage: NextPage = () => {
       };
       fetchInitialAdminData();
 
-    } else {
+    } else if (!loadingAuth && !isManager) {
       console.log("[ADMIN_PAGE_EFFECT] Not a manager or manager status changed to false. Clearing film data.");
       setAllFilmsData([]); 
       setAllHallPreferences({});
     }
-  }, [isManager, refreshStoredLayoutNames, toast]);
+  }, [isManager, loadingAuth, refreshStoredLayoutNames, toast]);
   
 
   useEffect(() => {
@@ -295,6 +295,15 @@ const FilmHallConfigPage: NextPage = () => {
       }
     }
   };
+  
+  if (loadingAuth) {
+    return (
+        <div className="flex flex-col items-center justify-center h-screen bg-background text-foreground p-8 text-center">
+            <Loader2 className="w-16 h-16 text-primary animate-spin mb-4" />
+            <h1 className="text-2xl font-semibold mb-2">Authenticating...</h1>
+        </div>
+    );
+  }
 
   if (!isManager) {
     return (
@@ -302,6 +311,11 @@ const FilmHallConfigPage: NextPage = () => {
         <ShieldAlert className="w-16 h-16 text-destructive mb-4" />
         <h1 className="text-2xl font-semibold mb-2">Access Denied</h1>
         <p className="text-muted-foreground">You must be a manager to access this page.</p>
+         <Button asChild variant="outline" className="mt-6">
+            <Link href="/">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
+            </Link>
+        </Button>
       </div>
     );
   }
