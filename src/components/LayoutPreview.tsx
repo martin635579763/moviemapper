@@ -38,7 +38,7 @@ export const LayoutPreview: React.FC = () => {
   }, [layout, previewMode]);
 
   const selectedSeatDisplayNames = useMemo(() => {
-    if (!layout || selectedSeatsForPurchase.length === 0) return "None";
+    if (!layout || !selectedSeatsForPurchase || selectedSeatsForPurchase.length === 0) return "None";
     
     const seatIdToDisplayNameMap = new Map<string, string>();
     layout.grid.forEach((rowArr, rowIndex) => {
@@ -179,13 +179,13 @@ export const LayoutPreview: React.FC = () => {
             <p className="text-sm font-medium">
                 Selected Seats: <span className="text-primary font-semibold">{selectedSeatDisplayNames}</span>
             </p>
-            {selectedSeatsForPurchase.length > 0 && typeof clearSeatSelection === 'function' && (
+            {selectedSeatsForPurchase && selectedSeatsForPurchase.length > 0 && typeof clearSeatSelection === 'function' && (
                  <Button variant="outline" size="sm" onClick={clearSeatSelection} className="text-xs">
                     Clear Selection
                  </Button>
             )}
         </div>
-        {selectedSeatsForPurchase.length > 0 && typeof confirmTicketPurchase === 'function' && (
+        {selectedSeatsForPurchase && selectedSeatsForPurchase.length > 0 && typeof confirmTicketPurchase === 'function' && (
           <Button onClick={confirmTicketPurchase} className="w-full text-sm" size="sm">
             <Ticket className="mr-2 h-4 w-4" /> Confirm Purchase ({selectedSeatsForPurchase.length})
           </Button>
