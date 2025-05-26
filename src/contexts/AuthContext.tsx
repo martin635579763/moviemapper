@@ -15,7 +15,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 // IMPORTANT: Replace this with your actual manager email address if it's not zhungmatin@gmail.com
-const MANAGER_EMAIL = "zhungmatin@gmail.com"; 
+const MANAGER_EMAIL = "zhungmartin@gmail.com"; 
 
 interface AuthContextType {
   user: User | null;

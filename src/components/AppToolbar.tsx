@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { Settings, Upload, Download, MousePointer, Eraser, Sofa, Tv2, Footprints, SquarePlus, Save, ListRestart, Search, Edit3 } from 'lucide-react';
+import { Settings, Upload, Download, MousePointer, Eraser, Sofa, Tv2, Footprints, SquarePlus, Save, ListRestart, Search, Edit3, ArrowLeft, Loader2 as LucideLoader2 } from 'lucide-react'; // Renamed Loader2 to avoid conflict
 import { sampleLayouts } from '@/data/sample-layouts';
 import { DEFAULT_ROWS, DEFAULT_COLS } from '@/lib/layout-utils';
 import {
@@ -50,43 +50,55 @@ export const AppToolbar: React.FC = () => {
     selectedSeatCategory, setSelectedSeatCategory,
     initializeLayout,
     loadLayout, exportLayout,
-    saveLayoutToStorage, loadLayoutFromStorage,
+    saveLayoutToStorage: contextSaveLayout, 
+    loadLayoutFromStorage,
     deleteStoredLayout,
-    storedLayoutNames, // from context, now async-populated
-    refreshStoredLayoutNames, // from context, now async
+    storedLayoutNames,
+    refreshStoredLayoutNames,
+    isLoadingLayouts,
   } = useLayoutContext();
 
-  const [rows, setRows] = useState(layout.rows || DEFAULT_ROWS);
-  const [cols, setCols] = useState(layout.cols || DEFAULT_COLS);
-  const [layoutName, setLayoutName] = useState(layout.name || "New Hall");
-  const [saveLayoutNameInput, setSaveLayoutNameInput] = useState(layout.name || "New Hall");
-  const [layoutToDelete, setLayoutToDelete] = useState<string | null>(null);
+  // Initialize local state with potentially undefined layout from context
+  const [rows, setRows] = useState(layout?.rows || DEFAULT_ROWS);
+  const [cols, setCols] = useState(layout?.cols || DEFAULT_COLS);
+  const [layoutName, setLayoutName] = useState(layout?.name || "New Hall"); // This is for the "Layout Name" input
+  const [saveLayoutNameInput, setSaveLayoutNameInput] = useState(layout?.name || "New Hall"); // This is for the "Save as name..." input
 
+  const [layoutToDelete, setLayoutToDelete] = useState<string | null>(null);
   const [filmsWithSchedules, setFilmsWithSchedules] = useState<Film[]>([]);
   const [isManagePopoverOpen, setIsManagePopoverOpen] = useState(false);
-
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setLayoutName(layout.name);
-    setRows(layout.rows);
-    setCols(layout.cols);
-    setSaveLayoutNameInput(layout.name);
-  }, [layout]); 
+    console.log("[AppToolbar_EFFECT] Layout context changed. Layout Object:", layout);
+    if (layout) {
+      // Update local state for dimension inputs and layout name display
+      setLayoutName(layout.name);
+      setRows(layout.rows);
+      setCols(layout.cols);
+      // CRITICALLY: Also update the "Save as name..." input field
+      setSaveLayoutNameInput(layout.name); 
+      console.log(`[AppToolbar_EFFECT] Updated local states: layoutName='${layout.name}', saveLayoutNameInput='${layout.name}', rows=${layout.rows}, cols=${layout.cols}`);
+    } else {
+      // This case should ideally not happen if LayoutContext provides a default layout
+      console.warn("[AppToolbar_EFFECT] Layout context is null/undefined. Resetting local states to default.");
+      setLayoutName("New Hall");
+      setRows(DEFAULT_ROWS);
+      setCols(DEFAULT_COLS);
+      setSaveLayoutNameInput("New Hall");
+    }
+  }, [layout]); // Depends on the whole layout object from context
 
   useEffect(() => {
     const fetchFilmData = async () => {
-      if (isManagePopoverOpen) { 
-        // Refreshing names before fetching films ensures we use the latest list.
-        // The context's storedLayoutNames will update, then this effect might re-run if storedLayoutNames is a dependency.
-        // await refreshStoredLayoutNames(); // Let context handle refresh on save/delete. UI button triggers manual refresh.
+      if (isManagePopoverOpen && typeof getSampleFilmsWithDynamicSchedules === 'function') {
         const films = await getSampleFilmsWithDynamicSchedules();
-        setFilmsWithSchedules(films);
+        setFilmsWithSchedules(Array.isArray(films) ? films : []);
       }
     };
     fetchFilmData();
-  }, [isManagePopoverOpen, storedLayoutNames]); // storedLayoutNames from context will trigger re-fetch if changed
+  }, [isManagePopoverOpen, storedLayoutNames]);
 
   const isHallInUse = useCallback((hallName: string): boolean => {
     return filmsWithSchedules.some(film =>
@@ -94,15 +106,16 @@ export const AppToolbar: React.FC = () => {
     );
   }, [filmsWithSchedules]);
 
-
   const handleInitialize = () => {
     initializeLayout(rows, cols, layoutName);
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value;
-    setLayoutName(newName);
-    setLayout(prev => ({ ...prev, name: newName }));
+    setLayoutName(newName); // This updates the "Layout Name" display input
+    if (setLayout && layout) { 
+      setLayout(prev => ({ ...prev!, name: newName }));
+    }
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,7 +125,7 @@ export const AppToolbar: React.FC = () => {
       reader.onload = async (e) => {
         try {
           const loadedLayoutData = JSON.parse(e.target?.result as string);
-          await loadLayout(loadedLayoutData); // loadLayout is async now
+          await loadLayout(loadedLayoutData);
         } catch (error) {
           console.error("Failed to parse layout file:", error);
         }
@@ -123,16 +136,26 @@ export const AppToolbar: React.FC = () => {
 
   const handleSaveToStorage = async () => {
     const trimmedSaveName = saveLayoutNameInput.trim();
-    await saveLayoutToStorage(trimmedSaveName); // saveLayoutToStorage is async now
+    // Log the state of inputs and context at the moment of save attempt
+    console.log(`[AppToolbar] handleSaveToStorage called.
+      Current 'Save as name...' input (trimmed): '${trimmedSaveName}'
+      Current 'Layout Name' input (local state): '${layoutName}'
+      Current context layout name: '${layout?.name}'`);
+      
+    if (!trimmedSaveName) {
+        // Using alert for immediate blocking feedback, toast might be missed
+        alert("Please enter a name for the layout to save."); 
+        return;
+    }
+    await contextSaveLayout(trimmedSaveName);
   };
 
   const handleDeleteStoredLayout = async () => {
     if (layoutToDelete) {
-      await deleteStoredLayout(layoutToDelete); // deleteStoredLayout is async now
+      await deleteStoredLayout(layoutToDelete);
       setLayoutToDelete(null);
     }
   };
-
 
   const toolClickHandlers = useMemo(() => {
     return TOOLBAR_TOOLS_CONFIG.reduce((acc, toolConfig) => {
@@ -141,12 +164,15 @@ export const AppToolbar: React.FC = () => {
     }, {} as Record<EditorTool, () => void>);
   }, [setSelectedTool]);
 
+  if (!layout) { // Should be handled by context providing a default
+    return <div className="p-3 border-b bg-card shadow-sm flex items-center justify-center text-muted-foreground">Initializing Layout Editor...</div>;
+  }
+
   return (
     <TooltipProvider>
       <div className="p-3 border-b bg-card shadow-sm flex flex-wrap items-center gap-2 text-sm">
         <h1 className="text-lg font-semibold text-primary mr-3 whitespace-nowrap">SeatLayout</h1>
 
-        {/* Tools */}
         <div className="flex items-center gap-0.5 bg-muted p-0.5 rounded-md">
           {TOOLBAR_TOOLS_CONFIG.map(tool => (
             <Tooltip key={tool.value}>
@@ -181,11 +207,10 @@ export const AppToolbar: React.FC = () => {
 
         <Separator orientation="vertical" className="h-7 mx-1" />
 
-        {/* Layout Actions */}
         <Input
           type="text"
           placeholder="Layout Name"
-          value={layoutName}
+          value={layoutName} // Controlled by local state, synced from context's layout.name
           onChange={handleNameChange}
           className="w-[150px] h-9 text-xs"
         />
@@ -206,30 +231,34 @@ export const AppToolbar: React.FC = () => {
 
         <Separator orientation="vertical" className="h-7 mx-1" />
 
-        {/* Local Storage Actions */}
         <div className="flex items-center gap-2">
             <Input
                 type="text"
                 placeholder="Save as name..."
-                value={saveLayoutNameInput}
+                value={saveLayoutNameInput} // Controlled by local state, synced from context's layout.name
                 onChange={(e) => setSaveLayoutNameInput(e.target.value)}
                 className="w-[150px] h-9 text-xs"
             />
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button onClick={handleSaveToStorage} size="sm" className="h-9 text-xs" variant="outline"><Save className="mr-1.5 h-3.5 w-3.5"/>Save</Button>
+                    <Button onClick={handleSaveToStorage} size="sm" className="h-9 text-xs" variant="outline" disabled={isLoadingLayouts}>
+                        {isLoadingLayouts ? <LucideLoader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5"/>}
+                        Save
+                    </Button>
                 </TooltipTrigger>
-                <TooltipContent><p>Save current layout to browser storage</p></TooltipContent>
+                <TooltipContent><p>Save current layout to storage</p></TooltipContent>
             </Tooltip>
         </div>
 
         {storedLayoutNames.length > 0 && (
-             <Select onValueChange={async (value) => { // Make async
+             <Select onValueChange={async (value) => {
                 if (value === "__manage__") return;
-                await loadLayoutFromStorage(value); // loadLayoutFromStorage is async
-              }}>
+                await loadLayoutFromStorage(value);
+              }}
+              disabled={isLoadingLayouts}
+              >
               <SelectTrigger className="w-[160px] h-9 text-xs">
-                <SelectValue placeholder="Load from Browser" />
+                <SelectValue placeholder="Load from Storage" />
               </SelectTrigger>
               <SelectContent>
                 {storedLayoutNames.map(name => (
@@ -240,17 +269,17 @@ export const AppToolbar: React.FC = () => {
         )}
          <Tooltip>
           <TooltipTrigger asChild>
-             <Button variant="outline" size="icon" className="h-9 w-9" onClick={async () => await refreshStoredLayoutNames()}><ListRestart className="h-4 w-4"/></Button>
+             <Button variant="outline" size="icon" className="h-9 w-9" onClick={async () => await refreshStoredLayoutNames()} disabled={isLoadingLayouts}>
+                {isLoadingLayouts ? <LucideLoader2 className="h-4 w-4 animate-spin"/> : <ListRestart className="h-4 w-4"/>}
+              </Button>
           </TooltipTrigger>
           <TooltipContent><p>Refresh saved layouts list</p></TooltipContent>
         </Tooltip>
 
-
-        {/* Sample Layouts */}
-         <Select onValueChange={async (value) => { // Make async
+         <Select onValueChange={async (value) => {
             const selectedSample = sampleLayouts.find(sl => sl.name === value);
             if (selectedSample) {
-              await loadLayout(JSON.parse(JSON.stringify(selectedSample))); // loadLayout is async
+              await loadLayout(JSON.parse(JSON.stringify(selectedSample)));
             }
           }}>
           <SelectTrigger className="w-[150px] h-9 text-xs">
@@ -263,7 +292,6 @@ export const AppToolbar: React.FC = () => {
           </SelectContent>
         </Select>
 
-        {/* Settings Popover */}
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="icon" className="h-9 w-9"><Settings className="h-4 w-4" /></Button>
@@ -319,9 +347,9 @@ export const AppToolbar: React.FC = () => {
                               variant="outline"
                               size="sm"
                               className="text-primary hover:bg-primary/10 h-7 px-2"
-                              onClick={async (e) => { // make async
-                                e.stopPropagation(); 
-                                await loadLayoutFromStorage(name); // loadLayoutFromStorage is async
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await loadLayoutFromStorage(name);
                                 setIsManagePopoverOpen(false);
                               }}
                             >
@@ -333,12 +361,12 @@ export const AppToolbar: React.FC = () => {
                               size="sm"
                               className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
                               onClick={(e) => {
-                                  e.stopPropagation(); 
+                                  e.stopPropagation();
                                   setLayoutToDelete(name);
                               }}
-                              disabled={isHallInUse(name)}
+                              disabled={isHallInUse(name) || (isLoadingLayouts && layoutToDelete === name)}
                           >
-                              Delete
+                              {(isLoadingLayouts && layoutToDelete === name) ? <LucideLoader2 className="h-3.5 w-3.5 animate-spin" /> : 'Delete'}
                           </Button>
                         </div>
                       </CommandItem>
@@ -354,7 +382,7 @@ export const AppToolbar: React.FC = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the layout "{layoutToDelete}" from your browser storage.
+              This action cannot be undone. This will permanently delete the layout "{layoutToDelete}" from your storage.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -367,29 +395,38 @@ export const AppToolbar: React.FC = () => {
   );
 };
 
-// ShadCN Command components (local copy for simplicity in AppToolbar)
-const Command: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, ...props }) => (
+// ShadCN Command components (local copy for AppToolbar)
+interface CommandProps extends React.HTMLAttributes<HTMLDivElement> {}
+const Command: React.FC<CommandProps> = ({ className, ...props }) => (
   <div className={cn("flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground", className)} {...props} />
 );
+Command.displayName = "Command";
 
-interface CommandInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  // No explicit 'type' prop needed if we rely on default HTML input behavior or don't need to restrict it
+
+interface CommandInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> {
+  type?: string; 
 }
-const CommandInput: React.ForwardRefExoticComponent<Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> & React.RefAttributes<HTMLInputElement> & { type?: string }> = React.forwardRef<HTMLInputElement, CommandInputProps>(({ className, type, ...props }, ref) => (
+const CommandInput = React.forwardRef<HTMLInputElement, CommandInputProps>(({ className, type, ...props }, ref) => (
   <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-    <input ref={ref} type={type} className={cn("flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 focus-visible:ring-0 focus-visible:ring-offset-0", className)} {...props} />
+    <input ref={ref} type={type || "text"} className={cn("flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 focus-visible:ring-0 focus-visible:ring-offset-0", className)} {...props} />
   </div>
 ));
 CommandInput.displayName = "CommandInput";
 
 
-const CommandList: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, ...props }) => (
+interface CommandListProps extends React.HTMLAttributes<HTMLDivElement> {}
+const CommandList: React.FC<CommandListProps> = ({ className, ...props }) => (
   <div className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)} {...props} />
 );
-const CommandEmpty: React.FC<React.HTMLAttributes<HTMLDivElement>> = (props) => (
+CommandList.displayName = "CommandList";
+
+interface CommandEmptyProps extends React.HTMLAttributes<HTMLDivElement> {}
+const CommandEmpty: React.FC<CommandEmptyProps> = (props) => (
   <div className="py-6 text-center text-sm" {...props} />
 );
+CommandEmpty.displayName = "CommandEmpty";
+
 
 interface CommandGroupProps extends React.HTMLAttributes<HTMLDivElement> {
   heading?: string;
@@ -400,20 +437,36 @@ const CommandGroup: React.FC<CommandGroupProps> = ({ className, heading, ...prop
     {props.children}
   </div>
 );
+CommandGroup.displayName = "CommandGroup";
+
 
 interface CommandItemProps extends React.HTMLAttributes<HTMLDivElement> {
-  onSelect?: (value: string) => void; 
-  value?: string; 
+  value?: string;
+  onSelect?: (value: string) => void;
 }
-const CommandItem: React.FC<CommandItemProps> = ({ className, onSelect, value, ...props }) => (
+const CommandItem = React.forwardRef<HTMLDivElement, CommandItemProps>(({ className, value, onSelect, ...props }, ref) => (
   <div
+    ref={ref}
     className={cn("relative flex cursor-default select-none items-center rounded-sm text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)}
-    onClick={() => {
-      if (onSelect && value) { // Ensure onSelect and value are defined before calling
+    onClick={(e) => {
+      if (props.onClick) props.onClick(e); 
+      if (onSelect && value) {
         onSelect(value);
       }
     }}
     {...props}
   />
-);
+));
 CommandItem.displayName = "CommandItem";
+
+// Renamed Loader2 from lucide-react to avoid conflict if it exists as a local component name too
+// Using LucideLoader2 for the import name.
+// const LucideLoader2 = ({className}: {className?: string}) => (
+//   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("lucide lucide-loader-2", className)}>
+//     <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+//   </svg>
+// );
+// No, I will use the imported Loader2 as LucideLoader2 directly
+// Forcing Loader2 to be imported as LucideLoader2
+// import { Loader2 as LucideLoader2 } from 'lucide-react';
+// already imported in header.
