@@ -24,6 +24,7 @@ interface AuthContextType {
   signUp: (email: string, pass: string) => Promise<boolean>;
   signIn: (email: string, pass: string) => Promise<boolean>;
   logout: () => Promise<void>;
+  toast: ReturnType<typeof useToast>['toast']; // Expose toast for register page
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,7 +56,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signUp = useCallback(async (email: string, pass: string): Promise<boolean> => {
-    if (!auth) return false;
+    if (!auth) {
+        toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive" });
+        return false;
+    }
     setLoadingAuth(true);
     try {
       await createUserWithEmailAndPassword(auth, email, pass);
@@ -74,7 +78,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router, toast]);
 
   const signIn = useCallback(async (email: string, pass: string): Promise<boolean> => {
-    if (!auth) return false;
+    if (!auth) {
+        toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive" });
+        return false;
+    }
     setLoadingAuth(true);
     try {
       await signInWithEmailAndPassword(auth, email, pass);
@@ -93,7 +100,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router, toast]);
 
   const logout = useCallback(async () => {
-    if (!auth) return;
+    if (!auth) {
+        toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive" });
+        return;
+    }
     setLoadingAuth(true);
     try {
       await signOut(auth);
@@ -108,13 +118,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [router, toast]);
 
-  if (loadingAuth && typeof window !== 'undefined') { 
+  if (loadingAuth) { 
     // Show a simple loading state, you can replace this with a spinner component
     return <div className="flex justify-center items-center h-screen"><p>Loading authentication...</p></div>;
   }
 
   return (
-    <AuthContext.Provider value={{ user, isManager, loadingAuth, signUp, signIn, logout }}>
+    <AuthContext.Provider value={{ user, isManager, loadingAuth, signUp, signIn, logout, toast }}>
       {children}
     </AuthContext.Provider>
   );
