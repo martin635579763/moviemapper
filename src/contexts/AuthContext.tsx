@@ -4,18 +4,18 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase'; 
-import { 
-  onAuthStateChanged, 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
+import { auth } from '@/lib/firebase';
+import {
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
   signOut,
-  type User 
+  type User
 } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 
 // IMPORTANT: Replace this with your actual manager email address
-const MANAGER_EMAIL = "your-manager-email@example.com"; 
+const MANAGER_EMAIL = "zhungmatin@gmail.com";
 
 interface AuthContextType {
   user: User | null;
@@ -40,36 +40,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log("[AuthContext] AuthProvider mounted. Imported auth instance:", auth);
     if (!auth) {
       console.error("[AuthContext] Firebase Auth is not initialized or available at mount!");
-      setLoadingAuth(false); // Ensure loading state is false if auth is not available
+      setLoadingAuth(false);
       return;
     }
 
-    // Set loading to true when starting to check auth state
-    setLoadingAuth(true); 
+    setLoadingAuth(true);
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       console.log("[AuthContext] onAuthStateChanged triggered. currentUser:", currentUser);
       setUser(currentUser);
-      if (currentUser) {
-        setIsManager(currentUser.email === MANAGER_EMAIL);
-        console.log(`[AuthContext] User: ${currentUser.email}, IsManager: ${currentUser.email === MANAGER_EMAIL}`);
+      if (currentUser && currentUser.email) { // Ensure currentUser and email exist
+        console.log("[AuthContext] Current user email:", currentUser.email);
+        console.log("[AuthContext] MANAGER_EMAIL:", MANAGER_EMAIL);
+        // Case-insensitive comparison
+        const isUserTheManager = currentUser.email.toLowerCase() === MANAGER_EMAIL.toLowerCase();
+        setIsManager(isUserTheManager);
+        console.log(`[AuthContext] User: ${currentUser.email}, IsManager set to: ${isUserTheManager}`);
       } else {
         setIsManager(false);
-        console.log("[AuthContext] No user, IsManager: false");
+        console.log("[AuthContext] No user or user email missing, IsManager set to: false");
       }
-      setLoadingAuth(false); // Finished checking auth state
+      setLoadingAuth(false);
     }, (error) => {
-      // Handle errors during auth state observation
       console.error("[AuthContext] Error in onAuthStateChanged:", error);
       setUser(null);
       setIsManager(false);
-      setLoadingAuth(false); // Ensure loading state is updated on error
+      setLoadingAuth(false);
     });
 
     return () => {
       console.log("[AuthContext] Unsubscribing from onAuthStateChanged.");
       unsubscribe();
     }
-  }, []); 
+  }, []); // auth is stable, so not strictly needed in deps for onAuthStateChanged setup
 
   const signUp = useCallback(async (email: string, pass: string): Promise<boolean> => {
     console.log("[AuthContext] signUp called. Checking auth instance:", auth);
@@ -81,17 +83,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await createUserWithEmailAndPassword(auth, email, pass);
       toast({ title: "Success", description: "Registration successful! You are now logged in." });
-      router.push('/'); 
+      router.push('/');
       return true;
     } catch (error: any) {
       console.error("[AuthContext] SignUp Error", error.code, error.message, error);
       toast({ title: "Sign Up Error", description: error.message || "Failed to register.", variant: "destructive" });
+      setLoadingAuth(false); // Explicitly set loading to false on error
       return false;
-    } finally {
-      // onAuthStateChanged will manage setting user, isManager, and final loadingAuth state
-      // setLoadingAuth(false); // This might be too soon if onAuthStateChanged hasn't fired yet
     }
-  }, [router, toast]);
+    // setLoadingAuth(false) will be handled by onAuthStateChanged
+  }, [router, toast, auth]);
 
   const signIn = useCallback(async (email: string, pass: string): Promise<boolean> => {
     console.log("[AuthContext] signIn called. Checking auth instance:", auth);
@@ -108,11 +109,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       console.error("[AuthContext] SignIn Error", error.code, error.message, error);
       toast({ title: "Sign In Error", description: error.message || "Failed to sign in.", variant: "destructive" });
+      setLoadingAuth(false); // Explicitly set loading to false on error
       return false;
-    } finally {
-      // setLoadingAuth(false); // Managed by onAuthStateChanged
     }
-  }, [router, toast]);
+    // setLoadingAuth(false) will be handled by onAuthStateChanged
+  }, [router, toast, auth]);
 
   const logout = useCallback(async () => {
     console.log("[AuthContext] logout called. Checking auth instance:", auth);
@@ -120,22 +121,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive" });
         return;
     }
-    setLoadingAuth(true); // Indicate logout is in progress
+    setLoadingAuth(true);
     try {
       await signOut(auth);
+      // Explicitly set user and manager state here for faster UI update,
+      // onAuthStateChanged will confirm this.
+      setUser(null);
+      setIsManager(false);
       toast({ title: "Logged Out", description: "You have been successfully logged out." });
-      // onAuthStateChanged will set user to null and isManager to false
-      // It will also set loadingAuth to false
-      router.push('/'); 
+      router.push('/');
     } catch (error: any) {
       console.error("[AuthContext] Logout Error", error.code, error.message, error);
       toast({ title: "Logout Error", description: error.message || "Failed to logout.", variant: "destructive" });
-      setLoadingAuth(false); // Ensure loading is false on logout error if onAuthStateChanged doesn't trigger quickly
+    } finally {
+        // onAuthStateChanged will handle setting loadingAuth to false ultimately,
+        // but setting it here ensures it's false if onAuthStateChanged is delayed or fails.
+        // However, it's generally better to let onAuthStateChanged be the source of truth for loading state post-auth events.
+        // For now, we'll let onAuthStateChanged handle it.
     }
-    // No finally setLoadingAuth(false) here as onAuthStateChanged should handle it.
-  }, [router, toast]);
+  }, [router, toast, auth]);
 
-  if (loadingAuth) { 
+  if (loadingAuth) {
     return <div className="flex justify-center items-center h-screen"><p>Loading authentication...</p></div>;
   }
 

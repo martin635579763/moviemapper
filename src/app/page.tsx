@@ -8,12 +8,15 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { UserCog, Clapperboard, LogIn, LogOut, Film as FilmIcon, Settings2, UserPlus } from 'lucide-react';
 import { useAuthContext } from '@/contexts/AuthContext';
-import { LayoutProvider } from '@/contexts/LayoutContext'; // Added LayoutProvider
+import { LayoutProvider } from '@/contexts/LayoutContext';
 
 
 export default function HomePage() {
   const [filmsToDisplay, setFilmsToDisplay] = useState<Film[]>([]);
   const { user, isManager, logout, loadingAuth } = useAuthContext();
+
+  // Diagnostic log
+  console.log("[HomePage] Rendering. loadingAuth:", loadingAuth, "user email:", user?.email, "isManager:", isManager);
 
   useEffect(() => {
     const fetchFilms = async () => {
