@@ -14,12 +14,13 @@ console.log("NEXT_PUBLIC_FIREBASE_APP_ID:", process.env.NEXT_PUBLIC_FIREBASE_APP
 
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyCZHWs3ocFmLl4CRYDsLz4389ds3n3spKY",
+  authDomain: "fir-test-9b277.firebaseapp.com",
+  projectId: "fir-test-9b277",
+  storageBucket: "fir-test-9b277.firebasestorage.app",
+  messagingSenderId: "199570559125",
+  appId: "1:199570559125:web:e61e4cdee2a84867f94b9c",
+  measurementId: "G-6F369V29S2"
 };
 
 // Log the resolved config to help with debugging environment variables

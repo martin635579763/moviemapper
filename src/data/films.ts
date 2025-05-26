@@ -1,7 +1,7 @@
 
 import type { HallLayout } from '@/types/layout';
 import type { FilmHallPreferences, UserDefinedFilmSchedules } from '@/types/schedule';
-import { getStoredLayoutNamesService } from '@/services/layoutStorageService'; // Now async
+import { getStoredLayoutNamesService } from '@/services/layoutStorageService'; 
 import { 
   getAllFilmHallPreferencesService, 
   getAllUserDefinedFilmSchedulesService 
@@ -19,7 +19,7 @@ export interface Film {
   title: string;
   description: string;
   posterUrl: string;
-  associatedLayoutName: string; // Fallback/default layout suggestion
+  associatedLayoutName: string; 
   duration: string;
   genre: string;
   schedule?: ScheduleEntry[];
@@ -39,11 +39,10 @@ const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
     id: '5',
     title: 'Chronicles of the Ancient Realm',
     description: 'An archaeologist deciphers an ancient prophecy predicting a celestial event, leading her on a perilous quest to find a mythical artifact before it falls into the wrong hands.',
-    posterUrl: 'https://image.tmdb.org/t/p/w500/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg', // Inception poster
     associatedLayoutName: 'Small Hall',
     duration: "2h 15m",
     genre: "Adventure, Fantasy",
-
   },
   {
     id: '3',
@@ -53,7 +52,6 @@ const BASE_FILM_DATA: Omit<Film, 'schedule'>[] = [
     associatedLayoutName: 'Special VIP Hall',
     duration: "2h 10m",
     genre: "Drama, Romance",
-
   },
   {
     id: '4',
@@ -84,13 +82,12 @@ export async function getSampleFilmsWithDynamicSchedules(): Promise<Film[]> {
   let filmHallPrefs: FilmHallPreferences = {};
   let userDefinedSchedules: UserDefinedFilmSchedules = {};
 
-  // Check if running in a browser environment before accessing localStorage
-  if (typeof window !== 'undefined' && window.localStorage) {
-    // Fetch data using services
-    // getStoredLayoutNamesService is now async
+  if (typeof window !== 'undefined') {
     storedLayoutNames = await getStoredLayoutNamesService(); 
-    filmHallPrefs = getAllFilmHallPreferencesService();
-    userDefinedSchedules = getAllUserDefinedFilmSchedulesService();
+    filmHallPrefs = await getAllFilmHallPreferencesService();
+    userDefinedSchedules = await getAllUserDefinedFilmSchedulesService();
+  } else {
+    console.warn("[films.ts] Window not available, cannot fetch from API/localStorage. Schedules may be empty or defaults.");
   }
   
   const currentlySavedAndValidHalls = new Set(storedLayoutNames);
@@ -164,21 +161,4 @@ export async function getSampleFilmsWithDynamicSchedules(): Promise<Film[]> {
       schedule: dynamicSchedule,
     };
   });
-}
-
-// Keep this synchronous version for cases where an immediate (potentially stale) list is needed
-// OR if the calling context can't be async. However, this is generally not ideal
-// if layout names are fetched asynchronously from an API.
-// For now, components will be updated to use the async version.
-export function getSampleFilmsWithSchedules_SYNC_DEPRECATED_DO_NOT_USE(): Film[] {
-  let storedLayoutNames: string[] = [];
-  if (typeof window !== 'undefined' && window.localStorage) {
-     // This is problematic because getStoredLayoutNamesService is async.
-     // This function version is kept only to show the original structure but should not be used
-     // if getStoredLayoutNamesService is truly async.
-     // storedLayoutNames = getStoredLayoutNamesService(); // This line would be incorrect if it's async
-     console.warn("getSampleFilmsWithSchedules_SYNC_DEPRECATED_DO_NOT_USE is called. This might use stale layout data if getStoredLayoutNamesService is async.")
-  }
-  // ... rest of the logic would be similar but using potentially stale 'storedLayoutNames'
-  return BASE_FILM_DATA.map(f => ({...f, schedule: []})); // Placeholder
 }

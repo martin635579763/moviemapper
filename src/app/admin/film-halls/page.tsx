@@ -26,92 +26,96 @@ import {
 
 const FilmHallConfigPage: NextPage = () => {
   const { isManager } = useAuthContext();
-  const { storedLayoutNames, refreshStoredLayoutNames } = useLayoutContext(); // For Hall dropdown in "Add Showtime"
+  const { storedLayoutNames, refreshStoredLayoutNames } = useLayoutContext(); 
   const { toast } = useToast();
   const router = useRouter();
 
   const [allFilmsData, setAllFilmsData] = useState<Film[]>([]);
   const [selectedFilmId, setSelectedFilmId] = useState<string | null>(null);
   
-  // State for Hall Preferences
-  const [currentFilmHallPreferences, setCurrentFilmHallPreferences] = useState<string[]>([]); // UI state for checkboxes of selected film
-  const [allHallPreferences, setAllHallPreferences] = useState<FilmHallPreferences>({}); // Loaded from/saved to localStorage via service
+  const [currentFilmHallPreferences, setCurrentFilmHallPreferences] = useState<string[]>([]); 
+  const [allHallPreferences, setAllHallPreferences] = useState<FilmHallPreferences>({}); 
 
-  // State for Custom Schedule Editing
-  const [editableSchedule, setEditableSchedule] = useState<ScheduleEntry[]>([]); // UI state for schedule list of selected film
+  const [editableSchedule, setEditableSchedule] = useState<ScheduleEntry[]>([]); 
   const [newShowtimeDay, setNewShowtimeDay] = useState<string>(DAYS_FOR_GENERATION[0]);
   const [newShowtimeTime, setNewShowtimeTime] = useState<string>(POSSIBLE_TIMES_FOR_GENERATION[0]);
-  const [newShowtimeHall, setNewShowtimeHall] = useState<string>(""); // Selected from storedLayoutNames
+  const [newShowtimeHall, setNewShowtimeHall] = useState<string>(""); 
 
-  // Effect for manager check
   useEffect(() => {
     if (!isManager) {
       router.replace('/');
     }
   }, [isManager, router]);
   
-  // Effect for initial data loading (all preferences, and films for the dropdown)
   useEffect(() => {
     if (isManager) {
       console.log("[ADMIN_PAGE_EFFECT] Manager detected. Fetching initial data.");
       refreshStoredLayoutNames(); 
       
-      getSampleFilmsWithDynamicSchedules().then(films => {
-        console.log("[ADMIN_PAGE_EFFECT] Films received from getSampleFilmsWithDynamicSchedules:", films);
-        if (Array.isArray(films)) {
-          setAllFilmsData(films);
-        } else {
-          console.error("[ADMIN_PAGE_EFFECT] CRITICAL: getSampleFilmsWithDynamicSchedules did NOT return an array. Received:", films, "Type:", typeof films);
+      const fetchInitialAdminData = async () => {
+        try {
+          const films = await getSampleFilmsWithDynamicSchedules();
+          console.log("[ADMIN_PAGE_EFFECT] Films received:", films);
+          if (Array.isArray(films)) {
+            setAllFilmsData(films);
+          } else {
+            console.error("[ADMIN_PAGE_EFFECT] CRITICAL: getSampleFilmsWithDynamicSchedules did NOT return an array. Received:", films, "Type:", typeof films);
+            setAllFilmsData([]); 
+          }
+
+          const loadedPrefs = await getAllFilmHallPreferencesService();
+          setAllHallPreferences(loadedPrefs);
+          console.log("[ADMIN_PAGE_EFFECT] Loaded allHallPreferences from service:", loadedPrefs);
+
+        } catch (error) {
+          console.error("[ADMIN_PAGE_EFFECT] CRITICAL: Error fetching initial admin data:", error);
           setAllFilmsData([]); 
+          setAllHallPreferences({});
+          toast({ title: "Error", description: "Could not load initial admin data.", variant: "destructive"});
         }
-      }).catch(error => {
-        console.error("[ADMIN_PAGE_EFFECT] CRITICAL: Error fetching films from getSampleFilmsWithDynamicSchedules:", error);
-        setAllFilmsData([]); 
-      });
-      
-      const loadedPrefs = getAllFilmHallPreferencesService();
-      setAllHallPreferences(loadedPrefs);
-      console.log("[ADMIN_PAGE_EFFECT] Loaded allHallPreferences from service:", loadedPrefs);
+      };
+      fetchInitialAdminData();
+
     } else {
       console.log("[ADMIN_PAGE_EFFECT] Not a manager or manager status changed to false. Clearing film data.");
       setAllFilmsData([]); 
       setAllHallPreferences({});
     }
-  }, [isManager, refreshStoredLayoutNames]);
+  }, [isManager, refreshStoredLayoutNames, toast]);
   
 
-  // Effect to update UI when a film is selected or related primary data changes
   useEffect(() => {
-    if (selectedFilmId && Array.isArray(allFilmsData) && allFilmsData.length > 0) {
-      console.log("[ADMIN_PAGE] Selected film ID:", selectedFilmId);
-      setCurrentFilmHallPreferences(allHallPreferences[selectedFilmId] || []);
-      console.log("[ADMIN_PAGE] Set currentFilmHallPreferences for selected film:", allHallPreferences[selectedFilmId] || []);
-      
-      const filmData = allFilmsData.find(f => f.id === selectedFilmId); 
-      console.log("[ADMIN_PAGE] Found filmData for selected film (used for schedule display):", filmData);
-      
-      const allUserSchedules = getAllUserDefinedFilmSchedulesService();
-      const userScheduleForSelectedFilm = allUserSchedules[selectedFilmId];
+    const updateUIForSelectedFilm = async () => {
+      if (selectedFilmId && Array.isArray(allFilmsData) && allFilmsData.length > 0) {
+        console.log("[ADMIN_PAGE] Selected film ID:", selectedFilmId);
+        setCurrentFilmHallPreferences(allHallPreferences[selectedFilmId] || []);
+        console.log("[ADMIN_PAGE] Set currentFilmHallPreferences for selected film:", allHallPreferences[selectedFilmId] || []);
+        
+        const filmData = allFilmsData.find(f => f.id === selectedFilmId); 
+        console.log("[ADMIN_PAGE] Found filmData for selected film (used for schedule display):", filmData);
+        
+        const allUserSchedules = await getAllUserDefinedFilmSchedulesService();
+        const userScheduleForSelectedFilm = allUserSchedules[selectedFilmId];
 
-      if (userScheduleForSelectedFilm) {
-        setEditableSchedule([...userScheduleForSelectedFilm]);
-        console.log("[ADMIN_PAGE] Set editableSchedule from user-defined for selected film:", userScheduleForSelectedFilm);
-      } else if (filmData?.schedule) {
-        setEditableSchedule([...filmData.schedule]); 
-        console.log("[ADMIN_PAGE] Set editableSchedule from default dynamic for selected film:", filmData.schedule);
-      } else {
+        if (userScheduleForSelectedFilm) {
+          setEditableSchedule([...userScheduleForSelectedFilm]);
+          console.log("[ADMIN_PAGE] Set editableSchedule from user-defined for selected film:", userScheduleForSelectedFilm);
+        } else if (filmData?.schedule) {
+          setEditableSchedule([...filmData.schedule]); 
+          console.log("[ADMIN_PAGE] Set editableSchedule from default dynamic for selected film:", filmData.schedule);
+        } else {
+          setEditableSchedule([]);
+          console.log("[ADMIN_PAGE] No schedule found for selected film, cleared editableSchedule.");
+        }
+      } else if (!selectedFilmId) { 
+        setCurrentFilmHallPreferences([]);
         setEditableSchedule([]);
-        console.log("[ADMIN_PAGE] No schedule found for selected film, cleared editableSchedule.");
+        console.log("[ADMIN_PAGE] No film selected, cleared preferences and schedule.");
       }
-
-    } else if (!selectedFilmId) { 
-      setCurrentFilmHallPreferences([]);
-      setEditableSchedule([]);
-      console.log("[ADMIN_PAGE] No film selected, cleared preferences and schedule.");
-    }
+    };
+    updateUIForSelectedFilm();
   }, [selectedFilmId, allFilmsData, allHallPreferences]); 
 
-  // Effect to manage the default for the "Add Showtime" hall input (newShowtimeHall)
   useEffect(() => {
     if (storedLayoutNames.length > 0) {
       if (!newShowtimeHall || !storedLayoutNames.includes(newShowtimeHall)) {
@@ -149,13 +153,13 @@ const FilmHallConfigPage: NextPage = () => {
     return allFilmsData.find(f => f.id === selectedFilmId);
   }, [allFilmsData, selectedFilmId]);
 
-  const handleSaveHallPreferences = () => {
+  const handleSaveHallPreferences = async () => {
     if (!selectedFilmId) {
       toast({ title: "Error", description: "Please select a film first.", variant: "destructive" });
       return;
     }
     const newAllPrefs = { ...allHallPreferences, [selectedFilmId]: currentFilmHallPreferences };
-    const result = saveAllFilmHallPreferencesService(newAllPrefs);
+    const result = await saveAllFilmHallPreferencesService(newAllPrefs);
     
     toast({ 
       title: result.success ? "Preferences Saved" : "Error Saving Preferences", 
@@ -165,18 +169,20 @@ const FilmHallConfigPage: NextPage = () => {
 
     if (result.success) {
       setAllHallPreferences(newAllPrefs); 
-      const allUserSchedules = getAllUserDefinedFilmSchedulesService();
+      const allUserSchedules = await getAllUserDefinedFilmSchedulesService();
       if (!allUserSchedules[selectedFilmId]) {
-        getSampleFilmsWithDynamicSchedules().then(updatedFilms => { 
-          setAllFilmsData(Array.isArray(updatedFilms) ? updatedFilms : []); 
-          const updatedSelectedFilmData = Array.isArray(updatedFilms) ? updatedFilms.find(f => f.id === selectedFilmId) : undefined;
-          setEditableSchedule(updatedSelectedFilmData?.schedule || []);
-        }).catch(error => {
+        try {
+            const updatedFilms = await getSampleFilmsWithDynamicSchedules();
+            setAllFilmsData(Array.isArray(updatedFilms) ? updatedFilms : []); 
+            const updatedSelectedFilmData = Array.isArray(updatedFilms) ? updatedFilms.find(f => f.id === selectedFilmId) : undefined;
+            setEditableSchedule(updatedSelectedFilmData?.schedule || []);
+            console.log("[ADMIN_PAGE] Hall prefs saved, no custom schedule exists, re-fetched films for default schedule update.");
+        } catch (error) {
             console.error("[ADMIN_PAGE] Error re-fetching films after saving hall preferences:", error);
             setAllFilmsData([]);
             setEditableSchedule([]);
-        });
-        console.log("[ADMIN_PAGE] Hall prefs saved, no custom schedule exists, re-fetched films for default schedule update.");
+            toast({ title: "Error", description: "Could not re-fetch film data after preference save.", variant: "destructive"});
+        }
       }
     }
   };
@@ -221,15 +227,15 @@ const FilmHallConfigPage: NextPage = () => {
     setEditableSchedule(prev => prev.filter((_, i) => i !== indexToRemove));
   };
 
-  const handleSaveCustomSchedule = () => {
+  const handleSaveCustomSchedule = async () => {
     if (!selectedFilmId) {
       toast({ title: "Error", description: "Please select a film first.", variant: "destructive" });
       return;
     }
     
-    const currentSchedules = getAllUserDefinedFilmSchedulesService();
+    const currentSchedules = await getAllUserDefinedFilmSchedulesService();
     currentSchedules[selectedFilmId] = editableSchedule;
-    const result = saveAllUserDefinedFilmSchedulesService(currentSchedules);
+    const result = await saveAllUserDefinedFilmSchedulesService(currentSchedules);
 
     toast({ 
       title: result.success ? "Schedule Saved" : "Error Saving Schedule", 
@@ -241,7 +247,6 @@ const FilmHallConfigPage: NextPage = () => {
       setAllFilmsData(prevFilms => {
         if (!Array.isArray(prevFilms)) {
           console.error("[ADMIN_PAGE] prevFilms in handleSaveCustomSchedule was not an array!", prevFilms);
-          // Attempt to recover by fetching fresh film data
           getSampleFilmsWithDynamicSchedules().then(freshFilms => {
              setAllFilmsData(Array.isArray(freshFilms) ? freshFilms.map(film => 
                 film.id === selectedFilmId ? { ...film, schedule: [...editableSchedule] } : film
@@ -250,7 +255,7 @@ const FilmHallConfigPage: NextPage = () => {
             console.error("Error fetching fresh films during recovery in handleSaveCustomSchedule", err);
             setAllFilmsData([]);
           });
-          return []; // Or some sensible default while recovery happens
+          return []; 
         }
         return prevFilms.map(film => 
           film.id === selectedFilmId ? { ...film, schedule: [...editableSchedule] } : film
@@ -259,15 +264,15 @@ const FilmHallConfigPage: NextPage = () => {
     }
   };
 
-  const handleRestoreDefaultSchedule = () => {
+  const handleRestoreDefaultSchedule = async () => {
     if (!selectedFilmId) {
       toast({ title: "Error", description: "Please select a film first.", variant: "destructive" });
       return;
     }
     
-    const currentSchedules = getAllUserDefinedFilmSchedulesService();
+    const currentSchedules = await getAllUserDefinedFilmSchedulesService();
     delete currentSchedules[selectedFilmId];
-    const result = saveAllUserDefinedFilmSchedulesService(currentSchedules);
+    const result = await saveAllUserDefinedFilmSchedulesService(currentSchedules);
     
     toast({ 
       title: result.success ? "Schedule Restored" : "Error Restoring Schedule", 
@@ -276,16 +281,18 @@ const FilmHallConfigPage: NextPage = () => {
     });
 
     if (result.success) {
-      getSampleFilmsWithDynamicSchedules().then(updatedFilms => { 
+      try {
+        const updatedFilms = await getSampleFilmsWithDynamicSchedules();
         setAllFilmsData(Array.isArray(updatedFilms) ? updatedFilms : []);
         const updatedSelectedFilmData = Array.isArray(updatedFilms) ? updatedFilms.find(f => f.id === selectedFilmId) : undefined;
         setEditableSchedule(updatedSelectedFilmData?.schedule || []);
-      }).catch(error => {
-        console.error("[ADMIN_PAGE] Error re-fetching films after restoring default schedule:", error);
-        setAllFilmsData([]);
-        setEditableSchedule([]);
-      });
-      console.log("[ADMIN_PAGE] Default schedule restored, re-fetched films.");
+        console.log("[ADMIN_PAGE] Default schedule restored, re-fetched films.");
+      } catch (error) {
+         console.error("[ADMIN_PAGE] Error re-fetching films after restoring default schedule:", error);
+         setAllFilmsData([]);
+         setEditableSchedule([]);
+         toast({ title: "Error", description: "Could not re-fetch film data after restoring default schedule.", variant: "destructive"});
+      }
     }
   };
 
