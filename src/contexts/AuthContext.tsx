@@ -37,12 +37,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log("[AuthContext] AuthProvider mounted. Imported auth instance from firebase.ts:", auth);
     if (!auth) {
-      console.error("AuthContext: Firebase Auth is not initialized!");
+      console.error("[AuthContext] Firebase Auth is not initialized or available at mount!");
       setLoadingAuth(false);
       return;
     }
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log("[AuthContext] onAuthStateChanged triggered. currentUser:", currentUser);
       setUser(currentUser);
       if (currentUser) {
         setIsManager(currentUser.email === MANAGER_EMAIL);
@@ -52,10 +54,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoadingAuth(false);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      console.log("[AuthContext] Unsubscribing from onAuthStateChanged.");
+      unsubscribe();
+    }
+  }, []); // Empty dependency array is correct here
 
   const signUp = useCallback(async (email: string, pass: string): Promise<boolean> => {
+    console.log("[AuthContext] signUp called. Checking auth instance:", auth);
     if (!auth) {
         toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive" });
         return false;
@@ -68,7 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       router.push('/'); // Redirect to home after successful registration
       return true;
     } catch (error: any) {
-      console.error("AuthContext: SignUp Error", error);
+      console.error("[AuthContext] SignUp Error", error.code, error.message, error);
       toast({ title: "Sign Up Error", description: error.message || "Failed to register.", variant: "destructive" });
       setIsManager(false); // Ensure manager status is reset on error
       return false;
@@ -78,6 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router, toast]);
 
   const signIn = useCallback(async (email: string, pass: string): Promise<boolean> => {
+    console.log("[AuthContext] signIn called. Checking auth instance:", auth);
     if (!auth) {
         toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive" });
         return false;
@@ -90,7 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       router.push('/'); // Redirect to home after successful login
       return true;
     } catch (error: any) {
-      console.error("AuthContext: SignIn Error", error);
+      console.error("[AuthContext] SignIn Error", error.code, error.message, error);
       toast({ title: "Sign In Error", description: error.message || "Failed to sign in.", variant: "destructive" });
       setIsManager(false); // Ensure manager status is reset on error
       return false;
@@ -100,6 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router, toast]);
 
   const logout = useCallback(async () => {
+    console.log("[AuthContext] logout called. Checking auth instance:", auth);
     if (!auth) {
         toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive" });
         return;
@@ -111,7 +119,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // onAuthStateChanged will set user to null and isManager to false
       router.push('/'); // Redirect to home on logout
     } catch (error: any) {
-      console.error("AuthContext: Logout Error", error);
+      console.error("[AuthContext] Logout Error", error.code, error.message, error);
       toast({ title: "Logout Error", description: error.message || "Failed to logout.", variant: "destructive" });
     } finally {
       setLoadingAuth(false);
@@ -119,7 +127,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router, toast]);
 
   if (loadingAuth) { 
-    // Show a simple loading state, you can replace this with a spinner component
     return <div className="flex justify-center items-center h-screen"><p>Loading authentication...</p></div>;
   }
 

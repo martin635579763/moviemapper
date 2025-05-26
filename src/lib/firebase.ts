@@ -43,24 +43,25 @@ if (getApps().length === 0) {
   if (firebaseConfig.apiKey && firebaseConfig.projectId) { // Only attempt init if essential config is present
     try {
       app = initializeApp(firebaseConfig);
-      console.log("Firebase app initialized successfully.");
+      console.log("[firebase.ts] Firebase app initialized successfully (new).");
       db = getFirestore(app);
       auth = getAuth(app); // Initialize Auth
+      console.log("[firebase.ts] Firebase Auth instance created (new):", auth ? "Instance OK" : "Instance FAILED");
     } catch (e) {
-      console.error("Error initializing Firebase app:", e);
+      console.error("[firebase.ts] Error initializing Firebase app:", e);
       // app, db, and auth will remain undefined
     }
   } else {
-    console.warn("Firebase app not initialized due to missing essential configuration (apiKey or projectId was falsy after reading from process.env).");
+    console.warn("[firebase.ts] Firebase app not initialized due to missing essential configuration (apiKey or projectId was falsy after reading from process.env).");
   }
 } else {
   app = getApps()[0];
   if (app) { // Ensure app is defined
      db = getFirestore(app);
      auth = getAuth(app); // Get Auth instance from existing app
-     console.log("Firebase app already initialized. Firestore and Auth instances obtained.");
+     console.log("[firebase.ts] Firebase app already initialized. Firestore and Auth instances obtained (existing). Auth:", auth ? "Instance OK" : "Instance FAILED");
   } else {
-    console.error("Firebase app was expected to be initialized but is not. Cannot get Firestore or Auth instance.")
+    console.error("[firebase.ts] Firebase app was expected to be initialized but is not. Cannot get Firestore or Auth instance.")
   }
 }
 
