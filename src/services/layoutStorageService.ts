@@ -1,8 +1,8 @@
 
 'use client';
 
-import type { HallLayout, SeatStatus } from '@/types/layout';
-import { db } from '@/lib/firebase'; 
+import type { HallLayout, SeatStatus, CellData } from '@/types/layout';
+import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 
 const LAYOUTS_COLLECTION = 'layouts';
@@ -10,7 +10,7 @@ const LAYOUTS_COLLECTION = 'layouts';
 interface SaveLayoutResult {
   success: boolean;
   message: string;
-  savedLayout?: HallLayout;
+  savedLayout?: HallLayout; 
   operationType: 'saved_new' | 'updated_existing' | 'cancelled' | 'error' | 'conflict';
 }
 
@@ -18,6 +18,31 @@ interface DeleteLayoutResult {
   success: boolean;
   message: string;
 }
+
+// Helper function to ensure a layout is "clean" for saving or loading as a template
+const cleanLayoutForTemplate = (layout: HallLayout): HallLayout => {
+  return {
+    ...layout,
+    name: layout.name || 'Untitled Hall', // Ensure name is present
+    grid: layout.grid.map(row => row.map(cell => {
+      const newCell: Partial<CellData> = { id: cell.id, type: cell.type }; // Start with minimal properties
+
+      // Remove runtime preview properties explicitly
+      // delete (cell as any).isOccluded; // Not standard properties, should not be on CellData directly
+      // delete (cell as any).hasGoodView;
+
+      if (cell.type === 'seat') {
+        // For a template, all seats should be 'available'
+        newCell.status = 'available' as SeatStatus;
+        newCell.category = cell.category || 'standard'; // Ensure category if it's a seat
+      }
+      // For other cell types (aisle, screen, empty), no status or category.
+      // screenCellIds will handle screen locations.
+      return newCell as CellData;
+    }))
+  };
+};
+
 
 export async function getStoredLayoutNamesService(): Promise<string[]> {
   if (!db) {
@@ -27,8 +52,7 @@ export async function getStoredLayoutNamesService(): Promise<string[]> {
   try {
     const layoutsCollectionRef = collection(db, LAYOUTS_COLLECTION);
     const snapshot = await getDocs(layoutsCollectionRef);
-    const names = snapshot.docs.map(doc => doc.id).sort();
-    // console.log("[Service_Firebase] Fetched layout names:", names);
+    const names = snapshot.docs.map(docData => docData.id).sort();
     return names;
   } catch (e) {
     console.error("[Service_Firebase] Error fetching stored layout names:", e);
@@ -49,31 +73,28 @@ export async function loadLayoutFromStorageService(layoutName: string): Promise<
     if (docSnap.exists()) {
       const data = docSnap.data();
       console.log(`[Service_Firebase] Successfully loaded layout: ${layoutName}`, data);
+      
       const grid = typeof data.gridJson === 'string' ? JSON.parse(data.gridJson) : data.grid;
       
-      // Ensure seats have a status after loading
-      const processedGrid = grid.map((row: any[]) => row.map((cell: any) => {
-        const newCell = {...cell};
-        if (newCell.type === 'seat' && !newCell.status) {
-            newCell.status = 'available' as SeatStatus;
-        }
-        return newCell;
-      }));
+      if (!grid || !Array.isArray(grid) || !data.name || typeof data.rows !== 'number' || typeof data.cols !== 'number') {
+        console.error(`[Service_Firebase] Loaded layout "${layoutName}" has invalid structure or missing essential fields.`);
+        return null;
+      }
 
-      const hallLayout: HallLayout = {
+      const loadedHallLayout: HallLayout = {
         name: data.name,
         rows: data.rows,
         cols: data.cols,
-        grid: processedGrid,
+        grid: grid, 
         screenCellIds: data.screenCellIds || [],
       };
-      return hallLayout;
+      return cleanLayoutForTemplate(loadedHallLayout);
     } else {
       console.warn(`[Service_Firebase] Layout "${layoutName}" not found.`);
       return null;
     }
   } catch (error) {
-    console.error(`[Service_Firebase] Error fetching stored layout "${layoutName}":`, error);
+    console.error(`[Service_Firebase] Error fetching or processing stored layout "${layoutName}":`, error);
     return null;
   }
 }
@@ -92,38 +113,29 @@ export async function saveLayoutToStorageService(
   }
   console.log(`[Service_Firebase] Attempting to save layout: ${trimmedSaveName}`);
 
-  // Prepare data for saving - ensure selected seats are saved as available
-  const layoutDataWithAvailableSeats = {
-    ...layoutToSave,
-    grid: layoutToSave.grid.map(row => row.map(cell => {
-      if (cell.type === 'seat' && cell.status === 'selected') {
-        return { ...cell, status: 'available' as SeatStatus };
-      }
-      return cell;
-    }))
-  };
+  const cleanedLayout = cleanLayoutForTemplate({ ...layoutToSave, name: trimmedSaveName });
+  console.log("[Service_Firebase] Layout after cleaning for save:", JSON.parse(JSON.stringify(cleanedLayout)));
 
 
   try {
     const layoutDocRef = doc(db, LAYOUTS_COLLECTION, trimmedSaveName);
-    const docSnap = await getDoc(layoutDocRef); // Check if it exists for operationType message
     
     const dataToSave = {
-      name: trimmedSaveName, 
-      rows: layoutDataWithAvailableSeats.rows,
-      cols: layoutDataWithAvailableSeats.cols,
-      gridJson: JSON.stringify(layoutDataWithAvailableSeats.grid), // Store grid as JSON string
-      screenCellIds: layoutDataWithAvailableSeats.screenCellIds || [],
+      name: cleanedLayout.name,
+      rows: cleanedLayout.rows,
+      cols: cleanedLayout.cols,
+      gridJson: JSON.stringify(cleanedLayout.grid), 
+      screenCellIds: cleanedLayout.screenCellIds || [],
     };
 
-    await setDoc(layoutDocRef, dataToSave); 
+    await setDoc(layoutDocRef, dataToSave);
     console.log(`[Service_Firebase] Successfully saved/updated layout: ${trimmedSaveName}`);
     
     return {
       success: true,
-      message: `Layout "${trimmedSaveName}" ${docSnap.exists() ? 'updated' : 'saved'} successfully.`,
-      savedLayout: { ...layoutDataWithAvailableSeats, name: trimmedSaveName },
-      operationType: docSnap.exists() ? 'updated_existing' : 'saved_new', 
+      message: `Layout "${trimmedSaveName}" saved successfully.`,
+      savedLayout: cleanedLayout, 
+      operationType: 'updated_existing', // Context will determine if it was new or update for toast
     };
   } catch (e: any) {
     console.error(`[Service_Firebase] Error saving layout "${trimmedSaveName}":`, e);
@@ -151,4 +163,3 @@ export async function deleteStoredLayoutService(layoutName: string): Promise<Del
     return { success: false, message: `Could not delete layout: ${e.message || 'Unknown error'}` };
   }
 }
-
