@@ -23,25 +23,24 @@ interface FilmTicketBookingInterfaceProps {
 }
 
 const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({ film, initialLayout, initialHallNameOverride, selectedDay, selectedTime }) => {
-  const { layout, loadLayout, loadLayoutFromStorage, isLoadingLayouts } = useLayoutContext();
+  const { layout, loadLayout, isLoadingLayouts } = useLayoutContext();
   
   useEffect(() => {
     const loadInitial = async () => {
+      let layoutIdentifier: HallLayout | string | null = null;
+      let hallNameForSoldSeatsLookup = initialLayout?.name || initialHallNameOverride || "";
+
       if (initialHallNameOverride) {
-        // Check if the override name matches a sample layout first
-        const sampleOverride = sampleLayouts.find(l => l.name === initialHallNameOverride);
-        if (sampleOverride) {
-          await loadLayout(JSON.parse(JSON.stringify(sampleOverride))); // Deep copy
-        } else {
-          // If not a sample, assume it's a stored layout name
-          await loadLayoutFromStorage(initialHallNameOverride);
-        }
+        layoutIdentifier = initialHallNameOverride; // loadLayout will check samples first, then storage
       } else if (initialLayout) {
-         await loadLayout(JSON.parse(JSON.stringify(initialLayout))); // Deep copy initialLayout
+         layoutIdentifier = initialLayout; // This is likely a sample layout object
       }
+      
+      // Pass filmId, day, time for sold seats lookup
+      await loadLayout(layoutIdentifier, film.id, selectedDay, selectedTime);
     };
     loadInitial();
-  }, [initialLayout, initialHallNameOverride, loadLayout, loadLayoutFromStorage]); // Removed sampleLayouts from deps as it's static
+  }, [initialLayout, initialHallNameOverride, loadLayout, film.id, selectedDay, selectedTime]);
 
   return (
     <div className="flex flex-col xl:flex-row gap-6 p-4 md:p-6 max-w-screen-2xl mx-auto">
@@ -133,20 +132,28 @@ function FilmPageContent() {
     let layoutToLoad: HallLayout | undefined = undefined;
     let initialHallNameOverrideForInterface: string | null = hallNameFromQuery ? decodeURIComponent(hallNameFromQuery) : null;
 
+    // If a specific hall is in the query, try to find it in samples first
     if (initialHallNameOverrideForInterface) {
       layoutToLoad = sampleLayouts.find(l => l.name === initialHallNameOverrideForInterface);
     }
 
+    // If not found in samples and no query override, use film's associated layout (if any) from samples
     if (!layoutToLoad && !initialHallNameOverrideForInterface && currentFilm.associatedLayoutName) {
       layoutToLoad = sampleLayouts.find(l => l.name === currentFilm.associatedLayoutName);
+      if (layoutToLoad) { // If found associated layout, use its name as override if no query param
+          initialHallNameOverrideForInterface = layoutToLoad.name;
+      }
     }
     
+    // layoutToLoad will be the sample layout object if found, otherwise undefined.
+    // initialHallNameOverrideForInterface will be the name from query, or film's associated, or null.
+    // The FilmTicketBookingInterface prioritizes initialHallNameOverride for storage lookup if layoutToLoad (sample) is not found.
     return { 
       film: currentFilm, 
-      layoutToLoad: layoutToLoad, 
-      initialHallNameOverride: layoutToLoad ? null : initialHallNameOverrideForInterface 
+      layoutToLoad: layoutToLoad, // This will be a sample layout object or undefined
+      initialHallNameOverride: layoutToLoad ? null : initialHallNameOverrideForInterface // If we have a sample, don't override with name
     };
-  }, [filmId, hallNameFromQuery, allFilms, sampleLayouts]); 
+  }, [filmId, hallNameFromQuery, allFilms, sampleLayouts]); // Added sampleLayouts dependency
 
   const { film, layoutToLoad, initialHallNameOverride } = filmData;
 
@@ -178,10 +185,12 @@ function FilmPageContent() {
     );
   }
   
-  const finalInitialLayoutProp = layoutToLoad;
+  const finalInitialLayoutProp = layoutToLoad; // layoutToLoad is already the specific sample HallLayout or undefined
 
   return (
-    <LayoutProvider key={`${filmId}-${hallNameFromQuery || film.associatedLayoutName || 'defaultLayoutContextKey'}-${dayFromQuery}-${timeFromQuery}`}> 
+    // Key ensures LayoutProvider re-mounts if filmId, specific hall (from query), day or time changes,
+    // providing a fresh context for each distinct booking scenario.
+    <LayoutProvider key={`${filmId}-${hallNameFromQuery || film.associatedLayoutName || 'defaultLayoutKey'}-${dayFromQuery}-${timeFromQuery}`}> 
        <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 text-foreground">
         <div className="p-4 md:p-6 sticky top-0 bg-background/80 backdrop-blur-md z-50 shadow-sm">
             <Button asChild variant="ghost" size="sm">
@@ -192,8 +201,8 @@ function FilmPageContent() {
         </div>
         <FilmTicketBookingInterface 
           film={film} 
-          initialLayout={finalInitialLayoutProp} 
-          initialHallNameOverride={initialHallNameOverride} 
+          initialLayout={finalInitialLayoutProp} // This is the sample layout object or undefined
+          initialHallNameOverride={initialHallNameOverride} // This is a string name (from query or film's association if not a sample) or null
           selectedDay={dayFromQuery ? decodeURIComponent(dayFromQuery) : null}
           selectedTime={timeFromQuery ? decodeURIComponent(timeFromQuery) : null}
         />

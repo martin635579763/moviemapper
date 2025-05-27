@@ -11,7 +11,7 @@ import {
   saveLayoutToStorageService,
   deleteStoredLayoutService,
 } from '@/services/layoutStorageService';
-import { saveTicketRecordService } from '@/services/ticketService';
+import { saveTicketRecordService, getSoldSeatsForShowtimeService } from '@/services/ticketService'; // Import getSoldSeatsForShowtimeService
 
 const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
 
@@ -53,7 +53,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
   const initializeLayout = useCallback((rows?: number, cols?: number, name?: string) => {
     const newLayout = createDefaultLayout(rows, cols, name);
     setLayout(newLayout);
-    setSelectedSeatsForPurchase([]);
+    setSelectedSeatsForPurchase([]); // Clear selection on new layout
     console.log("[Context] Layout initialized to default/new:", newLayout);
   }, []);
 
@@ -69,6 +69,11 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       const oldType = cell.type;
       const oldStatus = cell.status;
 
+      // Clear selection if modifying a selected seat with a different tool or erasing
+      if (selectedTool !== 'select' && cell.type === 'seat' && cell.status === 'selected') {
+        setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id));
+      }
+      
       if (cell.type === 'screen' && selectedTool !== 'screen') {
         newScreenCellIds = newScreenCellIds.filter(id => id !== cell.id);
       }
@@ -77,7 +82,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
         case 'seat':
           cell.type = 'seat';
           cell.category = selectedSeatCategory;
-          cell.status = 'available';
+          cell.status = 'available'; // New seats are available
           break;
         case 'aisle':
         case 'screen':
@@ -89,11 +94,6 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
           delete cell.category;
           delete cell.status;
 
-
-          if (oldType === 'seat' && oldStatus === 'selected') {
-            setSelectedSeatsForPurchase(prev => prev.filter(s => s.id !== cell.id));
-          }
-
           if (cell.type === 'screen' && !newScreenCellIds.includes(cell.id)) {
             newScreenCellIds.push(cell.id);
           } else if (oldType === 'screen' && cell.type !== 'screen') {
@@ -101,10 +101,13 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
           }
           break;
         case 'select':
+          // Select tool doesn't change type, category, or status in the editor directly
+          // It's more for preview interactions, which are handled by toggleSeatSelection
           if (cell.type === 'seat') {
             if (cell.category !== selectedSeatCategory) {
-              cell.category = selectedSeatCategory;
+              cell.category = selectedSeatCategory; // Allow category change with select tool + category chosen
             }
+             // Ensure status is maintained or defaulted if somehow missing
             if (!cell.status) cell.status = 'available';
           }
           break;
@@ -113,7 +116,12 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [selectedTool, selectedSeatCategory]);
 
-  const loadLayout = useCallback(async (newLayoutDataOrName: HallLayout | string | null) => {
+  const loadLayout = useCallback(async (
+    newLayoutDataOrName: HallLayout | string | null,
+    filmIdForSoldSeats?: string,
+    showtimeDayForSoldSeats?: string | null,
+    showtimeTimeForSoldSeats?: string | null
+  ) => {
     console.log("[Context] loadLayout called with:", newLayoutDataOrName);
     setSelectedSeatsForPurchase([]); // Clear selection when loading any new layout
     setIsLoadingLayouts(true);
@@ -129,11 +137,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
     } else if (newLayoutDataOrName) {
-      // If an object is passed, it might be a sample layout or an imported one.
-      // The service function `cleanLayoutForTemplate` should ideally be used here too,
-      // or ensure the object is already clean. For now, assume service handles cleaning if from storage.
-      // Samples should be inherently clean.
-      layoutToProcess = JSON.parse(JSON.stringify(newLayoutDataOrName));
+      layoutToProcess = JSON.parse(JSON.stringify(newLayoutDataOrName)); // Deep copy for samples or direct objects
     } else {
       toast({ variant: "destructive", title: "Error", description: "Layout data could not be loaded (null/undefined)." });
       setIsLoadingLayouts(false);
@@ -142,15 +146,48 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       if (!layoutToProcess || !layoutToProcess.grid || typeof layoutToProcess.rows !== 'number' || typeof layoutToProcess.cols !== 'number' || !layoutToProcess.name) {
-        throw new Error("Invalid layout structure after processing.");
+        throw new Error("Invalid layout structure after initial processing.");
       }
-      // The `loadLayoutFromStorageService` now returns a "cleaned" layout.
-      setLayout(layoutToProcess);
+
+      // Now fetch and apply sold seats if enough info is provided
+      if (filmIdForSoldSeats && layoutToProcess.name && showtimeDayForSoldSeats !== undefined && showtimeTimeForSoldSeats !== undefined) {
+        console.log(`[Context] Fetching sold seats for film: ${filmIdForSoldSeats}, hall: ${layoutToProcess.name}, day: ${showtimeDayForSoldSeats}, time: ${showtimeTimeForSoldSeats}`);
+        const soldSeatDisplayNames = await getSoldSeatsForShowtimeService(
+          filmIdForSoldSeats,
+          layoutToProcess.name,
+          showtimeDayForSoldSeats,
+          showtimeTimeForSoldSeats
+        );
+
+        if (soldSeatDisplayNames.length > 0) {
+          console.log(`[Context] Applying ${soldSeatDisplayNames.length} sold seats to layout.`);
+          const seatIdToDisplayNameMap = new Map<string, string>();
+          let seatCounter = 0; // Simple counter, could be more sophisticated if needed
+
+          layoutToProcess.grid = layoutToProcess.grid.map((rowArr, rIndex) => {
+            let seatNumInRow = 0;
+            const rowLetter = String.fromCharCode('A'.charCodeAt(0) + rIndex);
+            return rowArr.map((cell) => {
+              if (cell.type === 'seat') {
+                seatNumInRow++;
+                const displayName = `${rowLetter}${seatNumInRow}`;
+                if (soldSeatDisplayNames.includes(displayName)) {
+                  return { ...cell, status: 'sold' as SeatStatus };
+                }
+              }
+              return cell;
+            });
+          });
+        }
+      }
+
+      setLayout(layoutToProcess); // This is already a clean layout from service or copied sample
       toast({ title: "Success", description: `Layout "${layoutToProcess.name}" loaded.` });
       console.log("[Context] Layout loaded and set:", layoutToProcess);
     } catch (error: any) {
       console.error("[Context] Failed to process or set layout:", error);
       toast({ variant: "destructive", title: "Error Loading Layout", description: `Failed to load layout. ${error.message || 'Unknown error'}` });
+      setLayout(createDefaultLayout()); // Fallback to default layout on error
     } finally {
       setIsLoadingLayouts(false);
     }
@@ -191,66 +228,36 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
   const saveLayoutToStorage = useCallback(async (saveNameInput: string): Promise<boolean> => {
     const trimmedSaveName = saveNameInput.trim();
     console.log(`[Context:saveLayoutToStorage] Attempting to save. Input name: '${trimmedSaveName}'. Current context layout.name: '${layout?.name}'`);
-    console.log("[Context:saveLayoutToStorage] Current layout data in context:", JSON.parse(JSON.stringify(layout)));
-
+    
     if (!layout) {
-      console.error("[Context:saveLayoutToStorage] Save error: Layout object from context is null/undefined.");
       toast({ title: "Error Saving", description: "Current layout data is missing.", variant: "destructive" });
       return false;
     }
     if (!trimmedSaveName) {
-      console.log("[Context:saveLayoutToStorage] Save error: Trimmed layout name is empty.");
       toast({ title: "Error Saving", description: "Layout name cannot be empty.", variant: "destructive" });
       return false;
     }
-
-    const layoutDataForSaving: HallLayout = {
-      ...layout, // This is the current state of the layout from the editor
-      name: trimmedSaveName, // User wants to save it under this name
-    };
-    console.log("[Context:saveLayoutToStorage] Layout object PREPARED for service (name updated):", JSON.parse(JSON.stringify(layoutDataForSaving)));
+    
+    // The layout from context should already reflect current edits.
+    // The service will clean it (e.g., set seats to 'available') before saving.
+    const layoutDataForService = { ...layout, name: trimmedSaveName };
+    console.log("[Context:saveLayoutToStorage] Layout data BEFORE service call:", JSON.parse(JSON.stringify(layoutDataForService)));
 
     setIsLoadingLayouts(true);
-    let wasOverwrite = false;
-
     const currentStoredNames = await getStoredLayoutNamesService();
-    console.log("[Context:saveLayoutToStorage] Stored names fetched for overwrite check:", currentStoredNames);
-    const insensitiveMatchOriginalCase = currentStoredNames.find(
-      storedName => storedName.toLowerCase() === trimmedSaveName.toLowerCase()
-    );
-
-    if (insensitiveMatchOriginalCase) {
-      console.log(`[Context:saveLayoutToStorage] Existing name found (case-insensitive): '${insensitiveMatchOriginalCase}'. Input name: '${trimmedSaveName}'. Prompting for overwrite.`);
-       const confirmed = confirm( // This is the browser's confirmation dialog
-         `Layout "${insensitiveMatchOriginalCase}" already exists. Overwrite with current edits and save as "${trimmedSaveName}"?`
-       );
-      // const confirmed = true; // DEBUG: Assume overwrite confirmed
-      console.log(`[Context:saveLayoutToStorage] Overwrite confirmation result: ${confirmed}`);
-
-      if (!confirmed) {
-        toast({ title: "Save Cancelled", description: `Overwrite of layout "${insensitiveMatchOriginalCase}" was cancelled by the user.`, variant: "default" });
-        setIsLoadingLayouts(false);
-        return false;
-      }
-      wasOverwrite = true;
-      if (insensitiveMatchOriginalCase !== trimmedSaveName) {
-        console.log(`[Context:saveLayoutToStorage] Overwriting with different case. Deleting old entry: '${insensitiveMatchOriginalCase}' before saving as '${trimmedSaveName}'.`);
-        await deleteStoredLayoutService(insensitiveMatchOriginalCase);
-      }
-    }
-
-    // The service will clean the layout (e.g., set seats to 'available') before saving.
-    const result = await saveLayoutToStorageService(layoutDataForSaving);
+    
+    const result = await saveLayoutToStorageService(layoutDataForService, currentStoredNames);
     setIsLoadingLayouts(false);
     console.log("[Context:saveLayoutToStorage] Save service result:", result);
 
     if (result.success && result.savedLayout) {
-      setLayout(result.savedLayout); // Reflect the exact saved (and cleaned by service) state in the context
-      setSelectedSeatsForPurchase([]);
+      // Update context with the exact layout that was saved (it's cleaned by the service)
+      setLayout(result.savedLayout); 
+      setSelectedSeatsForPurchase([]); // Clear any selections after save
 
       toast({
         title: "Success",
-        description: wasOverwrite ? `Layout "${result.savedLayout.name}" updated.` : `Layout "${result.savedLayout.name}" saved.`,
+        description: result.message, 
       });
       await refreshStoredLayoutNames();
       return true;
@@ -260,30 +267,15 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
         description: result.message || "An unknown error occurred during save.",
         variant: "destructive"
       });
-      console.error("[Context:saveLayoutToStorage] Save operation failed in service:", result.message);
       return false;
     }
   }, [layout, toast, refreshStoredLayoutNames]);
 
   const loadLayoutFromStorage = useCallback(async (layoutName: string) => {
     console.log(`[Context] loadLayoutFromStorage called for: ${layoutName}`);
-    setSelectedSeatsForPurchase([]);
-    if (!layoutName) {
-      console.warn("[Context] loadLayoutFromStorage: layoutName is empty or undefined.");
-      toast({ variant: "destructive", title: "Error", description: "No layout name provided to load." });
-      return;
-    }
-    setIsLoadingLayouts(true);
-    const loadedLayout = await loadLayoutFromStorageService(layoutName); // Service returns a cleaned layout
-    setIsLoadingLayouts(false);
-    if (loadedLayout) {
-      setLayout(loadedLayout);
-      toast({ title: "Success", description: `Layout "${loadedLayout.name}" loaded.` });
-      console.log("[Context] Loaded layout from storage and set in context:", loadedLayout);
-    } else {
-      toast({ variant: "destructive", title: "Error", description: `Layout "${layoutName}" not found or is invalid.` });
-    }
-  }, [toast]);
+     // Pass undefined for showtime details, as this is generic loading
+    await loadLayout(layoutName, undefined, undefined, undefined);
+  }, [loadLayout]);
 
   const deleteStoredLayout = useCallback(async (layoutName: string) => {
     console.log(`[Context] deleteStoredLayout called for: ${layoutName}`);
@@ -293,7 +285,8 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     }
 
     setIsLoadingLayouts(true);
-    const result = await deleteStoredLayoutService(layoutName);
+    const currentStoredNames = await getStoredLayoutNamesService();
+    const result = await deleteStoredLayoutService(layoutName, currentStoredNames);
     setIsLoadingLayouts(false);
 
     toast({
@@ -314,22 +307,23 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
 
   const toggleSeatSelection = useCallback((rowIndex: number, colIndex: number) => {
     setLayout(prevLayout => {
-      if (!prevLayout) return createDefaultLayout();
+      if (!prevLayout) return createDefaultLayout(); // Should not happen if initialized
       const newGrid = prevLayout.grid.map(r => r.map(c => ({ ...c })));
       const cell = newGrid[rowIndex][colIndex];
 
       if (cell.type !== 'seat' || cell.status === 'sold') {
-        return prevLayout;
+        return prevLayout; // Do nothing for non-seats or sold seats
       }
 
       if (cell.status === 'selected') {
         cell.status = 'available';
         setSelectedSeatsForPurchase(prevSelected => prevSelected.filter(s => s.id !== cell.id));
-      } else { 
+      } else { // 'available'
         cell.status = 'selected';
+        // Ensure not to add duplicates if somehow triggered multiple times
         setSelectedSeatsForPurchase(prevSelected => {
           if (prevSelected.find(s => s.id === cell.id)) return prevSelected;
-          return [...prevSelected, { ...cell, status: 'selected' }]; 
+          return [...prevSelected, { ...cell, status: 'selected' as SeatStatus }]; // Add a copy
         });
       }
       return { ...prevLayout, grid: newGrid };
@@ -381,8 +375,9 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
     const saveResult = await saveTicketRecordService(ticketData);
 
     if (saveResult.success) {
+      // Update local layout state to mark seats as sold
       setLayout(prevLayout => {
-        if (!prevLayout) return createDefaultLayout();
+        if (!prevLayout) return createDefaultLayout(); // Should not happen
         const newGrid = prevLayout.grid.map(row =>
           row.map(cell => {
             if (selectedSeatsForPurchase.find(selectedSeat => selectedSeat.id === cell.id)) {
@@ -394,7 +389,7 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
         return { ...prevLayout, grid: newGrid };
       });
       toast({ title: "Purchase Confirmed!", description: `Tickets for ${selectedSeatsForPurchase.length} seat(s) for "${filmTitle}" purchased. Record ID: ${saveResult.id}`, });
-      setSelectedSeatsForPurchase([]);
+      setSelectedSeatsForPurchase([]); // Clear selection
     } else {
       toast({ title: "Purchase Error", description: `Could not save ticket record: ${saveResult.message}`, variant: "destructive" });
     }
@@ -403,10 +398,10 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
   const clearSeatSelection = useCallback(() => {
     if (selectedSeatsForPurchase.length === 0) return;
     setLayout(prevLayout => {
-      if (!prevLayout) return createDefaultLayout();
+      if (!prevLayout) return createDefaultLayout(); // Should not happen
       const newGrid = prevLayout.grid.map(row =>
         row.map(cell => {
-          if (cell.status === 'selected') { 
+          if (cell.status === 'selected') { // Only revert 'selected' seats
             return { ...cell, status: 'available' as SeatStatus };
           }
           return cell;
@@ -415,12 +410,12 @@ export const LayoutProvider = ({ children }: { children: ReactNode }) => {
       return { ...prevLayout, grid: newGrid };
     });
     setSelectedSeatsForPurchase([]);
-  }, [selectedSeatsForPurchase]);
+  }, [selectedSeatsForPurchase.length]); // Dependency on length to re-memoize if count changes
 
 
   return (
     <LayoutContext.Provider value={{
-      layout: layout || createDefaultLayout(),
+      layout: layout || createDefaultLayout(), // Ensure layout is never null
       setLayout,
       selectedTool, setSelectedTool,
       selectedSeatCategory, setSelectedSeatCategory,
