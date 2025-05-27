@@ -13,8 +13,9 @@ export function createDefaultLayout(rows: number = DEFAULT_ROWS, cols: number = 
         id: `r${r}c${c}`,
         type: 'empty',
       };
-      // If you want seats to be 'available' by default when created via editor:
-      // if (cell.type === 'seat') cell.status = 'available';
+      // Seats should be available by default
+      // This will be handled by the editor tool selection primarily.
+      // If a cell type is explicitly set to 'seat', its status will be 'available'.
       rowCells.push(cell);
     }
     grid.push(rowCells);
@@ -71,3 +72,4 @@ export function calculatePreviewStates(layout: HallLayout): HallLayout {
   }
   return { ...layout, grid: newGrid };
 }
+

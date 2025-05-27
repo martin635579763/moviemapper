@@ -31,22 +31,23 @@ export interface LayoutContextType {
   setSelectedSeatCategory: React.Dispatch<React.SetStateAction<SeatCategory>>;
   previewMode: PreviewMode;
   setPreviewMode: React.Dispatch<React.SetStateAction<PreviewMode>>;
-  initializeLayout: (rows: number, cols: number, name?: string) => void;
+  initializeLayout: (rows?: number, cols?: number, name?: string) => void;
   updateCell: (row: number, col: number) => void;
-  loadLayout: (newLayoutOrName: HallLayout | string | null) => Promise<void> | void; // Can be async if loading by name
+  loadLayout: (newLayoutOrName: HallLayout | string | null) => Promise<void> | void;
   exportLayout: () => void;
 
-  saveLayoutToStorage: (saveName: string) => Promise<boolean>; // Now async
-  loadLayoutFromStorage: (layoutName: string) => Promise<void>; // Now async
-  deleteStoredLayout: (layoutName: string) => Promise<void>; // Now async
+  saveLayoutToStorage: (saveName: string) => Promise<boolean>; 
+  loadLayoutFromStorage: (layoutName: string) => Promise<void>; 
+  deleteStoredLayout: (layoutName: string) => Promise<void>; 
   
   storedLayoutNames: string[]; 
-  refreshStoredLayoutNames: () => Promise<void>; // Now async
+  refreshStoredLayoutNames: () => Promise<void>; 
 
   selectedSeatsForPurchase: CellData[];
   toggleSeatSelection: (row: number, col: number) => void;
   confirmTicketPurchase: () => void;
   clearSeatSelection: () => void;
 
-  isLoadingLayouts: boolean; // For UI to show loading state
+  isLoadingLayouts: boolean; 
 }
+

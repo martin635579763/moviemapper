@@ -27,15 +27,32 @@ export const LayoutPreview: React.FC = () => {
     if (!layout) return [];
     if (previewMode === 'normal') {
       return layout.grid.map(row => row.map(cell => {
-        if (cell.type === 'seat' && !cell.status) {
-          return { ...cell, status: 'available' as SeatStatus };
+        const newCell = { ...cell };
+        if (newCell.type === 'seat' && !newCell.status) {
+          newCell.status = 'available' as SeatStatus;
         }
-        return cell;
+        // Update status if it's in selectedSeatsForPurchase
+        if (selectedSeatsForPurchase && selectedSeatsForPurchase.find(s => s.id === newCell.id)) {
+          newCell.status = 'selected';
+        } else if (newCell.type === 'seat' && newCell.status === 'selected' && (!selectedSeatsForPurchase || !selectedSeatsForPurchase.find(s => s.id === newCell.id))) {
+           // If it was selected but no longer in the purchase list, revert to available (unless sold)
+          if (newCell.status !== 'sold') newCell.status = 'available';
+        }
+        return newCell;
       }));
     }
-    const previewLayout = calculatePreviewStates(layout);
-    return previewLayout.grid;
-  }, [layout, previewMode]);
+    // For screen-view or occlusion, first apply those calcs, then selection status
+    let previewLayoutGrid = calculatePreviewStates(layout).grid;
+    return previewLayoutGrid.map(row => row.map(cell => {
+      const newCell = { ...cell };
+      if (selectedSeatsForPurchase && selectedSeatsForPurchase.find(s => s.id === newCell.id)) {
+        newCell.status = 'selected';
+      } else if (newCell.type === 'seat' && newCell.status === 'selected' && (!selectedSeatsForPurchase || !selectedSeatsForPurchase.find(s => s.id === newCell.id))) {
+        if (newCell.status !== 'sold') newCell.status = 'available';
+      }
+      return newCell;
+    }));
+  }, [layout, previewMode, selectedSeatsForPurchase]);
 
   const selectedSeatDisplayNames = useMemo(() => {
     if (!layout || !selectedSeatsForPurchase || selectedSeatsForPurchase.length === 0) return "None";
@@ -55,19 +72,24 @@ export const LayoutPreview: React.FC = () => {
     return selectedSeatsForPurchase
       .map(seat => seatIdToDisplayNameMap.get(seat.id))
       .filter(Boolean)
-      .sort()
+      .sort((a, b) => { // Sort alphanumerically: A1, A10, B2
+        const letterA = a!.match(/[A-Z]+/)![0];
+        const numA = parseInt(a!.match(/\d+/)![0]);
+        const letterB = b!.match(/[A-Z]+/)![0];
+        const numB = parseInt(b!.match(/\d+/)![0]);
+        if (letterA !== letterB) return letterA.localeCompare(letterB);
+        return numA - numB;
+      })
       .join(', ');
   }, [layout, selectedSeatsForPurchase]);
 
   if (!layout) return <p>Loading preview...</p>;
 
   const handleSeatClick = (rowIndex: number, colIndex: number) => {
-    if (typeof toggleSeatSelection === 'function') {
-        const cell = displayedGrid[rowIndex]?.[colIndex];
-        if (cell?.type === 'seat' && cell.status !== 'sold') {
-             toggleSeatSelection(rowIndex, colIndex);
-        }
-    }
+      const cell = displayedGrid[rowIndex]?.[colIndex];
+      if (cell?.type === 'seat' && cell.status !== 'sold') {
+           toggleSeatSelection(rowIndex, colIndex);
+      }
   };
   
   const mergedScreenCellsToSkip = new Set<string>();
@@ -176,16 +198,16 @@ export const LayoutPreview: React.FC = () => {
       
       <CardFooter className="p-3 border-t flex-col items-start gap-2">
         <div className="flex justify-between w-full items-center mb-1">
-            <p className="text-sm font-medium">
+            <p className="text-sm font-medium truncate">
                 Selected Seats: <span className="text-primary font-semibold">{selectedSeatDisplayNames}</span>
             </p>
-            {selectedSeatsForPurchase && selectedSeatsForPurchase.length > 0 && typeof clearSeatSelection === 'function' && (
+            {selectedSeatsForPurchase && selectedSeatsForPurchase.length > 0 && (
                  <Button variant="outline" size="sm" onClick={clearSeatSelection} className="text-xs">
                     Clear Selection
                  </Button>
             )}
         </div>
-        {selectedSeatsForPurchase && selectedSeatsForPurchase.length > 0 && typeof confirmTicketPurchase === 'function' && (
+        {selectedSeatsForPurchase && selectedSeatsForPurchase.length > 0 && (
           <Button onClick={confirmTicketPurchase} className="w-full text-sm" size="sm">
             <Ticket className="mr-2 h-4 w-4" /> Confirm Purchase ({selectedSeatsForPurchase.length})
           </Button>
@@ -194,3 +216,4 @@ export const LayoutPreview: React.FC = () => {
     </Card>
   );
 };
+

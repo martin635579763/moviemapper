@@ -1,8 +1,8 @@
 
 'use client';
 
-import type { HallLayout } from '@/types/layout';
-import { db } from '@/lib/firebase'; // Ensure db is correctly imported and initialized
+import type { HallLayout, SeatStatus } from '@/types/layout';
+import { db } from '@/lib/firebase'; 
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 
 const LAYOUTS_COLLECTION = 'layouts';
@@ -51,11 +51,20 @@ export async function loadLayoutFromStorageService(layoutName: string): Promise<
       console.log(`[Service_Firebase] Successfully loaded layout: ${layoutName}`, data);
       const grid = typeof data.gridJson === 'string' ? JSON.parse(data.gridJson) : data.grid;
       
+      // Ensure seats have a status after loading
+      const processedGrid = grid.map((row: any[]) => row.map((cell: any) => {
+        const newCell = {...cell};
+        if (newCell.type === 'seat' && !newCell.status) {
+            newCell.status = 'available' as SeatStatus;
+        }
+        return newCell;
+      }));
+
       const hallLayout: HallLayout = {
         name: data.name,
         rows: data.rows,
         cols: data.cols,
-        grid: grid,
+        grid: processedGrid,
         screenCellIds: data.screenCellIds || [],
       };
       return hallLayout;
@@ -71,7 +80,6 @@ export async function loadLayoutFromStorageService(layoutName: string): Promise<
 
 export async function saveLayoutToStorageService(
   layoutToSave: HallLayout,
-  currentStoredNames: string[] // Received from context, used for client-side confirm logic
 ): Promise<SaveLayoutResult> {
   if (!db) {
      console.error("[Service_Firebase] SaveLayout: Firestore DB instance is not available.");
@@ -84,36 +92,38 @@ export async function saveLayoutToStorageService(
   }
   console.log(`[Service_Firebase] Attempting to save layout: ${trimmedSaveName}`);
 
-  // Overwrite logic is mostly handled in the context before calling this service,
-  // based on currentStoredNames. This service just performs the write.
-  // However, for robustness, the service could also check existence if needed,
-  // but this might lead to double checks if context already did.
-  // For now, assume context manages the confirm() and calls this for actual save/update.
+  // Prepare data for saving - ensure selected seats are saved as available
+  const layoutDataWithAvailableSeats = {
+    ...layoutToSave,
+    grid: layoutToSave.grid.map(row => row.map(cell => {
+      if (cell.type === 'seat' && cell.status === 'selected') {
+        return { ...cell, status: 'available' as SeatStatus };
+      }
+      return cell;
+    }))
+  };
+
 
   try {
     const layoutDocRef = doc(db, LAYOUTS_COLLECTION, trimmedSaveName);
-    // To determine if it's an update or new for the message, we'd need to know
-    // if the document already exists. This check is done in context for the confirm.
-    // Let's assume the operationType will be passed or determined by context.
+    const docSnap = await getDoc(layoutDocRef); // Check if it exists for operationType message
     
     const dataToSave = {
-      name: trimmedSaveName, // Ensure the name stored in the doc matches the ID
-      rows: layoutToSave.rows,
-      cols: layoutToSave.cols,
-      gridJson: JSON.stringify(layoutToSave.grid),
-      screenCellIds: layoutToSave.screenCellIds || [],
+      name: trimmedSaveName, 
+      rows: layoutDataWithAvailableSeats.rows,
+      cols: layoutDataWithAvailableSeats.cols,
+      gridJson: JSON.stringify(layoutDataWithAvailableSeats.grid), // Store grid as JSON string
+      screenCellIds: layoutDataWithAvailableSeats.screenCellIds || [],
     };
 
-    await setDoc(layoutDocRef, dataToSave); // setDoc will create or overwrite
+    await setDoc(layoutDocRef, dataToSave); 
     console.log(`[Service_Firebase] Successfully saved/updated layout: ${trimmedSaveName}`);
     
     return {
       success: true,
-      message: `Layout "${trimmedSaveName}" saved successfully.`, // Generic message, context can refine
-      savedLayout: { ...layoutToSave, name: trimmedSaveName },
-      // operationType needs to be determined by context based on prior checks
-      // Defaulting to updated_existing assuming context handled this.
-      operationType: 'updated_existing', 
+      message: `Layout "${trimmedSaveName}" ${docSnap.exists() ? 'updated' : 'saved'} successfully.`,
+      savedLayout: { ...layoutDataWithAvailableSeats, name: trimmedSaveName },
+      operationType: docSnap.exists() ? 'updated_existing' : 'saved_new', 
     };
   } catch (e: any) {
     console.error(`[Service_Firebase] Error saving layout "${trimmedSaveName}":`, e);
@@ -141,3 +151,4 @@ export async function deleteStoredLayoutService(layoutName: string): Promise<Del
     return { success: false, message: `Could not delete layout: ${e.message || 'Unknown error'}` };
   }
 }
+
