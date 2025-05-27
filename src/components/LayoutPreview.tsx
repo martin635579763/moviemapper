@@ -9,10 +9,17 @@ import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Button } from '@/components/ui/button';
 import type { PreviewMode, SeatStatus, CellData } from '@/types/layout';
+import type { Film } from '@/data/films'; // Import Film type
 import { Ticket } from 'lucide-react';
 import { calculatePreviewStates } from '@/lib/layout-utils';
 
-export const LayoutPreview: React.FC = () => {
+interface LayoutPreviewProps {
+  film?: Film; // Optional: pass film for ticket record
+  selectedDay?: string | null; // Optional: pass day for ticket record
+  selectedTime?: string | null; // Optional: pass time for ticket record
+}
+
+export const LayoutPreview: React.FC<LayoutPreviewProps> = ({ film, selectedDay, selectedTime }) => {
   const { 
     layout, 
     previewMode, 
@@ -25,26 +32,17 @@ export const LayoutPreview: React.FC = () => {
 
   const displayedGrid = useMemo(() => {
     if (!layout) return [];
-    if (previewMode === 'normal') {
-      return layout.grid.map(row => row.map(cell => {
-        const newCell = { ...cell };
-        if (newCell.type === 'seat' && !newCell.status) {
-          newCell.status = 'available' as SeatStatus;
-        }
-        // Update status if it's in selectedSeatsForPurchase
-        if (selectedSeatsForPurchase && selectedSeatsForPurchase.find(s => s.id === newCell.id)) {
-          newCell.status = 'selected';
-        } else if (newCell.type === 'seat' && newCell.status === 'selected' && (!selectedSeatsForPurchase || !selectedSeatsForPurchase.find(s => s.id === newCell.id))) {
-           // If it was selected but no longer in the purchase list, revert to available (unless sold)
-          if (newCell.status !== 'sold') newCell.status = 'available';
-        }
-        return newCell;
-      }));
+    let baseGrid = layout.grid;
+
+    if (previewMode !== 'normal') {
+      baseGrid = calculatePreviewStates(layout).grid;
     }
-    // For screen-view or occlusion, first apply those calcs, then selection status
-    let previewLayoutGrid = calculatePreviewStates(layout).grid;
-    return previewLayoutGrid.map(row => row.map(cell => {
+    
+    return baseGrid.map(row => row.map(cell => {
       const newCell = { ...cell };
+      if (newCell.type === 'seat' && !newCell.status) {
+        newCell.status = 'available' as SeatStatus;
+      }
       if (selectedSeatsForPurchase && selectedSeatsForPurchase.find(s => s.id === newCell.id)) {
         newCell.status = 'selected';
       } else if (newCell.type === 'seat' && newCell.status === 'selected' && (!selectedSeatsForPurchase || !selectedSeatsForPurchase.find(s => s.id === newCell.id))) {
@@ -72,7 +70,7 @@ export const LayoutPreview: React.FC = () => {
     return selectedSeatsForPurchase
       .map(seat => seatIdToDisplayNameMap.get(seat.id))
       .filter(Boolean)
-      .sort((a, b) => { // Sort alphanumerically: A1, A10, B2
+      .sort((a, b) => { 
         const letterA = a!.match(/[A-Z]+/)![0];
         const numA = parseInt(a!.match(/\d+/)![0]);
         const letterB = b!.match(/[A-Z]+/)![0];
@@ -83,13 +81,24 @@ export const LayoutPreview: React.FC = () => {
       .join(', ');
   }, [layout, selectedSeatsForPurchase]);
 
-  if (!layout) return <p>Loading preview...</p>;
+  if (!layout) return <p className="p-4 text-center">Loading layout preview...</p>;
 
   const handleSeatClick = (rowIndex: number, colIndex: number) => {
       const cell = displayedGrid[rowIndex]?.[colIndex];
       if (cell?.type === 'seat' && cell.status !== 'sold') {
            toggleSeatSelection(rowIndex, colIndex);
       }
+  };
+
+  const handleConfirmPurchase = () => {
+    if (film && film.id && film.title) {
+      confirmTicketPurchase(film.id, film.title, selectedDay || null, selectedTime || null);
+    } else {
+      // Fallback or error if film details aren't available
+      // This might happen if LayoutPreview is used outside the FilmTicketBookingInterface context
+      console.warn("Attempted to confirm purchase without full film details. Using current layout name as fallback.");
+      confirmTicketPurchase("unknown_film_id", "Unknown Film", selectedDay || null, selectedTime || null);
+    }
   };
   
   const mergedScreenCellsToSkip = new Set<string>();
@@ -208,7 +217,7 @@ export const LayoutPreview: React.FC = () => {
             )}
         </div>
         {selectedSeatsForPurchase && selectedSeatsForPurchase.length > 0 && (
-          <Button onClick={confirmTicketPurchase} className="w-full text-sm" size="sm">
+          <Button onClick={handleConfirmPurchase} className="w-full text-sm" size="sm" disabled={!film}>
             <Ticket className="mr-2 h-4 w-4" /> Confirm Purchase ({selectedSeatsForPurchase.length})
           </Button>
         )}
@@ -216,4 +225,3 @@ export const LayoutPreview: React.FC = () => {
     </Card>
   );
 };
-

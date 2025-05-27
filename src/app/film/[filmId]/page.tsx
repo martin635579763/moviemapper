@@ -12,7 +12,7 @@ import type { HallLayout } from '@/types/layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, Clock, Ticket as TicketIconLucide, Info } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Clock, Ticket as TicketIconLucide, Info, Loader2 } from 'lucide-react';
 
 interface FilmTicketBookingInterfaceProps {
   film: Film;
@@ -28,18 +28,20 @@ const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({
   useEffect(() => {
     const loadInitial = async () => {
       if (initialHallNameOverride) {
+        // Check if the override name matches a sample layout first
         const sampleOverride = sampleLayouts.find(l => l.name === initialHallNameOverride);
         if (sampleOverride) {
-          await loadLayout(JSON.parse(JSON.stringify(sampleOverride)));
+          await loadLayout(JSON.parse(JSON.stringify(sampleOverride))); // Deep copy
         } else {
+          // If not a sample, assume it's a stored layout name
           await loadLayoutFromStorage(initialHallNameOverride);
         }
       } else if (initialLayout) {
-         await loadLayout(JSON.parse(JSON.stringify(initialLayout))); 
+         await loadLayout(JSON.parse(JSON.stringify(initialLayout))); // Deep copy initialLayout
       }
     };
     loadInitial();
-  }, [initialLayout, initialHallNameOverride, loadLayout, loadLayoutFromStorage, sampleLayouts]);
+  }, [initialLayout, initialHallNameOverride, loadLayout, loadLayoutFromStorage]); // Removed sampleLayouts from deps as it's static
 
   return (
     <div className="flex flex-col xl:flex-row gap-6 p-4 md:p-6 max-w-screen-2xl mx-auto">
@@ -95,7 +97,8 @@ const FilmTicketBookingInterface: React.FC<FilmTicketBookingInterfaceProps> = ({
         </div>
         <div className="flex-grow mt-1 rounded-lg overflow-hidden shadow-md">
           <div className="h-full min-h-[400px] lg:min-h-[500px] flex flex-col">
-             <LayoutPreview />
+             {/* Pass film, selectedDay, selectedTime to LayoutPreview */}
+             <LayoutPreview film={film} selectedDay={selectedDay} selectedTime={selectedTime} />
           </div>
         </div>
       </div>
@@ -137,17 +140,10 @@ function FilmPageContent() {
     if (!layoutToLoad && !initialHallNameOverrideForInterface && currentFilm.associatedLayoutName) {
       layoutToLoad = sampleLayouts.find(l => l.name === currentFilm.associatedLayoutName);
     }
-
-    if (!layoutToLoad && !initialHallNameOverrideForInterface) { 
-      // Fallback to first sample layout if no specific layout is determined
-      // This might not be ideal if no sample layouts exist or if a stored layout should be the default
-      layoutToLoad = sampleLayouts.length > 0 ? sampleLayouts[0] : undefined;
-    }
     
     return { 
       film: currentFilm, 
       layoutToLoad: layoutToLoad, 
-      // Pass the hall name from query if it's for a stored layout (not found in samples)
       initialHallNameOverride: layoutToLoad ? null : initialHallNameOverrideForInterface 
     };
   }, [filmId, hallNameFromQuery, allFilms, sampleLayouts]); 
@@ -161,7 +157,7 @@ function FilmPageContent() {
   if (allFilms.length === 0) {
      return (
         <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-4">
-            <TicketIconLucide className="w-16 h-16 text-primary mb-4 animate-bounce" />
+            <Loader2 className="w-16 h-16 text-primary mb-4 animate-spin" />
             <h1 className="text-2xl font-semibold mb-2">Loading Film Data...</h1>
         </div>
     );
@@ -182,10 +178,7 @@ function FilmPageContent() {
     );
   }
   
-  // If layoutToLoad is determined (e.g. from associatedLayoutName or query param matching a sample), use it.
-  // Otherwise, initialHallNameOverride will be used (which means it's a stored layout name).
   const finalInitialLayoutProp = layoutToLoad;
-
 
   return (
     <LayoutProvider key={`${filmId}-${hallNameFromQuery || film.associatedLayoutName || 'defaultLayoutContextKey'}-${dayFromQuery}-${timeFromQuery}`}> 
@@ -199,8 +192,8 @@ function FilmPageContent() {
         </div>
         <FilmTicketBookingInterface 
           film={film} 
-          initialLayout={finalInitialLayoutProp} // This can be undefined if initialHallNameOverride is set
-          initialHallNameOverride={initialHallNameOverride} // This is used if initialLayout is undefined
+          initialLayout={finalInitialLayoutProp} 
+          initialHallNameOverride={initialHallNameOverride} 
           selectedDay={dayFromQuery ? decodeURIComponent(dayFromQuery) : null}
           selectedTime={timeFromQuery ? decodeURIComponent(timeFromQuery) : null}
         />
@@ -211,7 +204,7 @@ function FilmPageContent() {
 
 export default function FilmPage() {
   return (
-    <Suspense fallback={<div className="flex justify-center items-center h-screen">Loading film page details...</div>}>
+    <Suspense fallback={<div className="flex justify-center items-center h-screen text-lg">Loading film page details...</div>}>
       <FilmPageContent />
     </Suspense>
   );

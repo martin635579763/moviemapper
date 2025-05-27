@@ -9,7 +9,7 @@ export interface CellData {
   id: string; // e.g., "r0c0"
   type: CellType;
   category?: SeatCategory; // For seats
-  status?: SeatStatus; // For seats in ticket selling demo
+  status?: SeatStatus; 
   isOccluded?: boolean; 
   hasGoodView?: boolean; 
 }
@@ -45,9 +45,13 @@ export interface LayoutContextType {
 
   selectedSeatsForPurchase: CellData[];
   toggleSeatSelection: (row: number, col: number) => void;
-  confirmTicketPurchase: () => void;
+  confirmTicketPurchase: (
+    filmId: string, 
+    filmTitle: string, 
+    day: string | null, 
+    time: string | null
+  ) => Promise<void>; // Modified signature
   clearSeatSelection: () => void;
 
   isLoadingLayouts: boolean; 
 }
-
