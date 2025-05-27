@@ -9,14 +9,14 @@ import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Button } from '@/components/ui/button';
 import type { PreviewMode, SeatStatus, CellData } from '@/types/layout';
-import type { Film } from '@/data/films'; // Import Film type
+import type { Film } from '@/data/films'; 
 import { Ticket } from 'lucide-react';
 import { calculatePreviewStates } from '@/lib/layout-utils';
 
 interface LayoutPreviewProps {
-  film?: Film; // Optional: pass film for ticket record
-  selectedDay?: string | null; // Optional: pass day for ticket record
-  selectedTime?: string | null; // Optional: pass time for ticket record
+  film?: Film; 
+  selectedDay?: string | null; 
+  selectedTime?: string | null; 
 }
 
 export const LayoutPreview: React.FC<LayoutPreviewProps> = ({ film, selectedDay, selectedTime }) => {
@@ -32,21 +32,39 @@ export const LayoutPreview: React.FC<LayoutPreviewProps> = ({ film, selectedDay,
 
   const displayedGrid = useMemo(() => {
     if (!layout) return [];
-    let baseGrid = layout.grid;
-
+    
+    // Start with the grid from the context, potentially processed by calculatePreviewStates
+    let sourceGrid = layout.grid;
     if (previewMode !== 'normal') {
-      baseGrid = calculatePreviewStates(layout).grid;
+      // calculatePreviewStates returns a new layout object with a new grid
+      // It's important that calculatePreviewStates preserves existing statuses like 'sold'
+      sourceGrid = calculatePreviewStates(layout).grid;
     }
     
-    return baseGrid.map(row => row.map(cell => {
-      const newCell = { ...cell };
-      if (newCell.type === 'seat' && !newCell.status) {
-        newCell.status = 'available' as SeatStatus;
-      }
-      if (selectedSeatsForPurchase && selectedSeatsForPurchase.find(s => s.id === newCell.id)) {
-        newCell.status = 'selected';
-      } else if (newCell.type === 'seat' && newCell.status === 'selected' && (!selectedSeatsForPurchase || !selectedSeatsForPurchase.find(s => s.id === newCell.id))) {
-        if (newCell.status !== 'sold') newCell.status = 'available';
+    return sourceGrid.map(row => row.map(cell => {
+      const newCell = { ...cell }; // Copy cell data from sourceGrid
+
+      if (newCell.type === 'seat') {
+        let finalStatus = newCell.status;
+
+        // If status is missing, default to 'available'
+        if (!finalStatus) {
+          finalStatus = 'available';
+        }
+
+        // If the seat is not 'sold', check if it's selected
+        if (finalStatus !== 'sold') {
+          if (selectedSeatsForPurchase && selectedSeatsForPurchase.find(s => s.id === newCell.id)) {
+            finalStatus = 'selected';
+          }
+        }
+        // If it was 'selected' but no longer in selectedSeatsForPurchase (and not 'sold'), revert to 'available'
+        else if (finalStatus === 'selected' && (!selectedSeatsForPurchase || !selectedSeatsForPurchase.find(s => s.id === newCell.id))) {
+           // This case is mostly handled by toggleSeatSelection setting it to 'available',
+           // but this ensures consistency if selectedSeatsForPurchase is cleared externally.
+           // Crucially, don't change 'sold' seats.
+        }
+        newCell.status = finalStatus as SeatStatus;
       }
       return newCell;
     }));
@@ -84,8 +102,10 @@ export const LayoutPreview: React.FC<LayoutPreviewProps> = ({ film, selectedDay,
   if (!layout) return <p className="p-4 text-center">Loading layout preview...</p>;
 
   const handleSeatClick = (rowIndex: number, colIndex: number) => {
-      const cell = displayedGrid[rowIndex]?.[colIndex];
-      if (cell?.type === 'seat' && cell.status !== 'sold') {
+      // Use the raw layout grid for finding the cell to toggle,
+      // as displayedGrid might have temporary visual states.
+      const cellToToggle = layout.grid[rowIndex]?.[colIndex];
+      if (cellToToggle?.type === 'seat' && cellToToggle.status !== 'sold') {
            toggleSeatSelection(rowIndex, colIndex);
       }
   };
@@ -94,10 +114,8 @@ export const LayoutPreview: React.FC<LayoutPreviewProps> = ({ film, selectedDay,
     if (film && film.id && film.title) {
       confirmTicketPurchase(film.id, film.title, selectedDay || null, selectedTime || null);
     } else {
-      // Fallback or error if film details aren't available
-      // This might happen if LayoutPreview is used outside the FilmTicketBookingInterface context
       console.warn("Attempted to confirm purchase without full film details. Using current layout name as fallback.");
-      confirmTicketPurchase("unknown_film_id", "Unknown Film", selectedDay || null, selectedTime || null);
+      confirmTicketPurchase("unknown_film_id", layout?.name || "Unknown Film", selectedDay || null, selectedTime || null);
     }
   };
   
@@ -188,7 +206,7 @@ export const LayoutPreview: React.FC<LayoutPreviewProps> = ({ film, selectedDay,
                 return (
                   <GridCell
                     key={cell.id}
-                    cell={cell}
+                    cell={cell} // Pass the cell from displayedGrid which has the final computed status
                     seatNumber={currentSeatNumberDisplay}
                     isPreviewCell
                     currentPreviewMode={previewMode}
@@ -217,8 +235,13 @@ export const LayoutPreview: React.FC<LayoutPreviewProps> = ({ film, selectedDay,
             )}
         </div>
         {selectedSeatsForPurchase && selectedSeatsForPurchase.length > 0 && (
-          <Button onClick={handleConfirmPurchase} className="w-full text-sm" size="sm" disabled={!film}>
-            <Ticket className="mr-2 h-4 w-4" /> Confirm Purchase ({selectedSeatsForPurchase.length})
+          <Button 
+            onClick={handleConfirmPurchase} 
+            className="w-full text-sm" 
+            size="sm" 
+            disabled={!film || (selectedSeatsForPurchase && selectedSeatsForPurchase.length === 0)}
+          >
+            <Ticket className="mr-2 h-4 w-4" /> Confirm Purchase ({selectedSeatsForPurchase ? selectedSeatsForPurchase.length : 0})
           </Button>
         )}
       </CardFooter>
